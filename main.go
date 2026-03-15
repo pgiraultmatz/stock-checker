@@ -106,7 +106,7 @@ func getRSIStatus(rsi float64) string {
 }
 
 func getStockAnalysis(stock Stock) *StockResult {
-    url := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?range=3mo&interval=1d", stock.Ticker)
+    url := fmt.Sprintf("https://query1.finance.yahoo.com/v8/finance/chart/%s?range=6mo&interval=1wk", stock.Ticker)
 
     req, err := http.NewRequest("GET", url, nil)
     if err != nil {
@@ -179,7 +179,7 @@ func getStockAnalysis(stock Stock) *StockResult {
         changePercent = ((currentPrice - previousClose) / previousClose) * 100
     }
 
-    rsi := calculateRSI(closes, 7)
+    rsi := calculateRSI(closes, 14)
 
     return &StockResult{
         Stock:         stock,
