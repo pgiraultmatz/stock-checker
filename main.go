@@ -222,6 +222,10 @@ func displayStockResult(result *StockResult) {
 
 func main() {
     stocks := []Stock{
+        // Cryptos
+        {Ticker: "BTC-USD", Name: "BTC (USD)", Category: "Cryptos"},
+        {Ticker: "ETH-USD", Name: "ETH (USD)", Category: "Cryptos"},
+
         // France
         {Ticker: "MC.PA", Name: "LVMH", Category: "France"},
         {Ticker: "OR.PA", Name: "L'Oréal", Category: "France"},
@@ -255,7 +259,7 @@ func main() {
         {Ticker: "CROX", Name: "Crocs Inc.", Category: "USA"},
 
         // Defense
-        {Ticker: "DFNS", Name: "VanEck Defense UCITS ETF", Category: "Defense"},
+        {Ticker: "DFNS.MI", Name: "VanEck Defense UCITS ETF", Category: "Defense"},
         {Ticker: "LMT", Name: "Lockheed Martin", Category: "Defense"},
         {Ticker: "KTOS", Name: "Kratos Defense", Category: "Defense"},
         {Ticker: "PLTR", Name: "Palantir Technologies", Category: "Defense"},
@@ -282,11 +286,12 @@ func main() {
     // Trier par catégorie dans l'ordre souhaité
     categoryOrder := map[string]int{
         "Métaux":  1,
-        "Energie": 2,
-        "USA":     3,
-        "Defense": 4,
-        "France":  5,
-        "Autres":  6,
+        "Cryptos": 2,
+        "Energie": 3,
+        "USA":     4,
+        "Defense": 5,
+        "France":  6,
+        "Autres":  7,
     }
 
     sort.Slice(results, func(i, j int) bool {
