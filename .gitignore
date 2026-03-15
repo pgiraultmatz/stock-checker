@@ -1,0 +1,42 @@
+# Binaires
+stock-checker
+trading-cli
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Fichiers de test
+*.test
+*.out
+
+# Fichiers debug
+debug_*.json
+yahoo_*.json
+debug_api.go
+test.go
+
+# Dépendances vendorées (si tu utilises vendor/)
+/vendor/
+/Godeps/
+
+# Fichiers de couverture
+*.coverprofile
+coverage.txt
+coverage.html
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Fichiers temporaires
+*.tmp
+*.bak
+*.log
