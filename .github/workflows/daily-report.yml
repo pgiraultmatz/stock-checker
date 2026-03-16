@@ -1,29 +1,44 @@
-name: Test Email
+name: Daily Stock Report
 
 on:
+  schedule:
+    - cron: '0 7 * * *'
   workflow_dispatch:
 
 jobs:
-  test:
+  stock-report:
     runs-on: ubuntu-latest
-    steps:
-      - name: Create test message
-        run: |
-          echo "🧪 Test d'envoi d'email depuis GitHub Actions" > test.txt
-          echo "" >> test.txt
-          echo "Si tu reçois cet email, la configuration fonctionne !" >> test.txt
-          echo "" >> test.txt
-          echo "Date: $(date)" >> test.txt
 
-      - name: Send test email
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run stock analysis
+        run: |
+          echo "📊 Génération du rapport boursier..."
+          CGO_ENABLED=0 go run main.go > report.txt
+          echo "✅ Rapport généré ($(wc -l < report.txt) lignes)"
+          echo ""
+          echo "Aperçu des 30 premières lignes:"
+          head -30 report.txt
+
+      - name: Send email report
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
           server_port: 465
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: 🧪 Test - GitHub Actions Email
-          body: file://test.txt
+          subject: 📊 Rapport Boursier du $(date +%d/%m/%Y)
+          body: file://report.txt
           to: ${{ secrets.EMAIL_RECIPIENT }}
           from: Stock Analyzer <${{ secrets.EMAIL_USERNAME }}>
           content_type: text/plain
