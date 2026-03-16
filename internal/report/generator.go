@@ -1,0 +1,228 @@
+// Package report generates HTML reports from stock analysis results.
+package report
+
+import (
+	"bytes"
+	"embed"
+	"fmt"
+	"html/template"
+	"sort"
+	"time"
+
+	"stock-checker/internal/models"
+)
+
+//go:embed templates/*.html
+var templateFS embed.FS
+
+// Generator creates HTML reports from stock analysis results.
+type Generator struct {
+	templates      *template.Template
+	categoryEmojis map[string]string
+	categoryOrder  map[string]int
+}
+
+// TemplateData contains the data passed to the HTML template.
+type TemplateData struct {
+	Title           string
+	GeneratedAt     string
+	CategoryGroups  []CategoryGroupData
+	TotalStocks     int
+	OversoldCount   int
+	OverboughtCount int
+}
+
+// CategoryGroupData represents a category with its stocks for the template.
+type CategoryGroupData struct {
+	Name   string
+	Emoji  string
+	Stocks []StockRowData
+}
+
+// StockRowData represents a single stock row for the template.
+type StockRowData struct {
+	Name          string
+	Price         string
+	Change        string
+	ChangePercent float64
+	ChangeClass   string
+	ChangeIcon    string
+	RSI           string
+	RSIValue      float64
+	RSIStatus     string
+	RSIStatusHTML template.HTML
+}
+
+// NewGenerator creates a new report generator.
+func NewGenerator(categoryEmojis map[string]string, categoryOrder map[string]int) (*Generator, error) {
+	funcMap := template.FuncMap{
+		"formatPrice": func(price float64) string {
+			return fmt.Sprintf("%.2f", price)
+		},
+		"formatChange": func(change float64) string {
+			return fmt.Sprintf("%+.2f%%", change)
+		},
+		"formatRSI": func(rsi float64) string {
+			return fmt.Sprintf("%.1f", rsi)
+		},
+		"getChangeClass": func(change float64) string {
+			if change > 0.01 {
+				return "positive"
+			} else if change < -0.01 {
+				return "negative"
+			}
+			return "neutral"
+		},
+		"getChangeIcon": func(change float64) string {
+			if change > 0.01 {
+				return "↑"
+			} else if change < -0.01 {
+				return "↓"
+			}
+			return "→"
+		},
+	}
+
+	tmpl, err := template.New("").Funcs(funcMap).ParseFS(templateFS, "templates/*.html")
+	if err != nil {
+		return nil, fmt.Errorf("parsing templates: %w", err)
+	}
+
+	return &Generator{
+		templates:      tmpl,
+		categoryEmojis: categoryEmojis,
+		categoryOrder:  categoryOrder,
+	}, nil
+}
+
+// Generate creates an HTML report from the analysis results.
+func (g *Generator) Generate(results []*models.StockResult) (string, error) {
+	data := g.prepareTemplateData(results)
+
+	var buf bytes.Buffer
+	if err := g.templates.ExecuteTemplate(&buf, "report.html", data); err != nil {
+		return "", fmt.Errorf("executing template: %w", err)
+	}
+
+	return buf.String(), nil
+}
+
+// prepareTemplateData transforms analysis results into template-ready data.
+func (g *Generator) prepareTemplateData(results []*models.StockResult) TemplateData {
+	// Sort results by category order, then by name
+	sort.Slice(results, func(i, j int) bool {
+		orderI := g.categoryOrder[results[i].Stock.Category]
+		orderJ := g.categoryOrder[results[j].Stock.Category]
+		if orderI != orderJ {
+			return orderI < orderJ
+		}
+		return results[i].Stock.Name < results[j].Stock.Name
+	})
+
+	// Group by category
+	categoryMap := make(map[string][]StockRowData)
+	categoryOrderList := make([]string, 0)
+	oversoldCount := 0
+	overboughtCount := 0
+
+	for _, result := range results {
+		if _, exists := categoryMap[result.Stock.Category]; !exists {
+			categoryOrderList = append(categoryOrderList, result.Stock.Category)
+		}
+
+		row := g.createStockRow(result)
+		categoryMap[result.Stock.Category] = append(categoryMap[result.Stock.Category], row)
+
+		if result.IsOversold() {
+			oversoldCount++
+		}
+		if result.IsOverbought() {
+			overboughtCount++
+		}
+	}
+
+	// Sort category list by order
+	sort.Slice(categoryOrderList, func(i, j int) bool {
+		return g.categoryOrder[categoryOrderList[i]] < g.categoryOrder[categoryOrderList[j]]
+	})
+
+	// Build category groups
+	groups := make([]CategoryGroupData, 0, len(categoryOrderList))
+	for _, catName := range categoryOrderList {
+		groups = append(groups, CategoryGroupData{
+			Name:   catName,
+			Emoji:  g.getCategoryEmoji(catName),
+			Stocks: categoryMap[catName],
+		})
+	}
+
+	return TemplateData{
+		Title:           "Stock Market Report",
+		GeneratedAt:     time.Now().Format("Monday, January 2, 2006 at 3:04 PM"),
+		CategoryGroups:  groups,
+		TotalStocks:     len(results),
+		OversoldCount:   oversoldCount,
+		OverboughtCount: overboughtCount,
+	}
+}
+
+// createStockRow creates a template-ready stock row.
+func (g *Generator) createStockRow(result *models.StockResult) StockRowData {
+	changeClass := "neutral"
+	changeIcon := "→"
+	if result.ChangePercent > 0.01 {
+		changeClass = "positive"
+		changeIcon = "↑"
+	} else if result.ChangePercent < -0.01 {
+		changeClass = "negative"
+		changeIcon = "↓"
+	}
+
+	var rsiStatus string
+	var rsiStatusHTML template.HTML
+	if result.IsOversold() {
+		rsiStatus = "OVERSOLD"
+		rsiStatusHTML = template.HTML(`<span class="rsi-oversold">OVERSOLD</span>`)
+	} else if result.IsOverbought() {
+		rsiStatus = "OVERBOUGHT"
+		rsiStatusHTML = template.HTML(`<span class="rsi-overbought">OVERBOUGHT</span>`)
+	}
+
+	return StockRowData{
+		Name:          result.Stock.Name,
+		Price:         fmt.Sprintf("%.2f", result.CurrentPrice),
+		Change:        fmt.Sprintf("%+.2f%%", result.ChangePercent),
+		ChangePercent: result.ChangePercent,
+		ChangeClass:   changeClass,
+		ChangeIcon:    changeIcon,
+		RSI:           fmt.Sprintf("%.1f", result.RSI),
+		RSIValue:      result.RSI,
+		RSIStatus:     rsiStatus,
+		RSIStatusHTML: rsiStatusHTML,
+	}
+}
+
+// getCategoryEmoji returns the emoji for a category.
+func (g *Generator) getCategoryEmoji(category string) string {
+	emojiMap := map[string]string{
+		"1st_place_medal": "🥇",
+		"coin":            "🪙",
+		"zap":             "⚡",
+		"us":              "🇺🇸",
+		"shield":          "🛡️",
+		"fr":              "🇫🇷",
+		"earth_americas":  "🌍",
+		"gold":            "🥇",
+		"bitcoin":         "₿",
+		"globe":           "🌍",
+	}
+
+	if emojiName, ok := g.categoryEmojis[category]; ok {
+		if emoji, exists := emojiMap[emojiName]; exists {
+			return emoji
+		}
+		return emojiName
+	}
+
+	return "📊"
+}

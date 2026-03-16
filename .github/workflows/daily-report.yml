@@ -2,24 +2,33 @@ name: Daily Stock Report
 
 on:
   schedule:
+    # Run at 7:00 UTC every day (8:00 Paris time)
     - cron: '0 7 * * *'
   workflow_dispatch:
+
+env:
+  GO_VERSION: '1.22'
 
 jobs:
   stock-report:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
-      - name: Download dependencies
-        run: go mod download
+      - name: Build application
+        run: |
+          echo "🔨 Building stock-checker..."
+          go build -o stock-checker ./cmd/stock-checker
+          echo "✅ Build complete"
 
       - name: Set date
         id: date
@@ -28,7 +37,7 @@ jobs:
       - name: Run stock analysis
         run: |
           echo "📊 Generating stock market report..."
-          CGO_ENABLED=0 go run main.go > report.html
+          ./stock-checker -config config.json -output report.html -verbose
           echo "✅ HTML report generated"
 
       - name: Send email report
@@ -38,8 +47,16 @@ jobs:
           server_port: 465
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: 📊 Stock Market Report - ${{ steps.date.outputs.TODAY }}
+          subject: "📊 Stock Market Report - ${{ steps.date.outputs.TODAY }}"
           html_body: file://report.html
           to: ${{ secrets.EMAIL_RECIPIENT }}
           from: Stock Analyzer <${{ secrets.EMAIL_USERNAME }}>
           secure: true
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stock-report-${{ steps.date.outputs.TODAY }}
+          path: report.html
+          retention-days: 30
