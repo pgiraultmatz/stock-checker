@@ -144,17 +144,14 @@ func getStockAnalysis(stock Stock) *StockResult {
 
 	currentPrice := closes[len(closes)-1]
 
-	// NEW LOGIC: find last significant variation
 	var previousClose float64
 	var changePercent float64
 
-	// Search for last different price
 	for i := len(closes) - 2; i >= 0; i-- {
 		if closes[i] != currentPrice && closes[i] > 0 {
 			previousClose = closes[i]
 			changePercent = ((currentPrice - previousClose) / previousClose) * 100
 
-			// If variation is significant (> 0.01%), we stop
 			if math.Abs(changePercent) > 0.01 {
 				break
 			}
@@ -174,7 +171,6 @@ func getStockAnalysis(stock Stock) *StockResult {
 func generateHTMLReport(results []*StockResult, categoryOrder map[string]int) string {
 	var html strings.Builder
 
-	// Header HTML
 	html.WriteString(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -183,45 +179,48 @@ func generateHTMLReport(results []*StockResult, categoryOrder map[string]int) st
     <title>Stock Market Report</title>
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: #0d1117;
-            color: #c9d1d9;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f6f8fa;
+            color: #24292f;
             padding: 20px;
             margin: 0;
         }
         .container {
             max-width: 900px;
             margin: 0 auto;
-            background: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 6px;
+            background-color: #ffffff;
+            border: 1px solid #d0d7de;
+            border-radius: 8px;
             overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
         .header {
             background: linear-gradient(135deg, #238636 0%, #1f6feb 100%);
-            color: white;
-            padding: 30px;
+            color: #ffffff;
+            padding: 32px;
             text-align: center;
         }
         .header h1 {
             margin: 0;
-            font-size: 28px;
+            font-size: 32px;
+            color: #ffffff;
         }
         .header p {
-            margin: 10px 0 0 0;
-            opacity: 0.9;
+            margin: 12px 0 0 0;
+            opacity: 0.95;
+            color: #ffffff;
+            font-size: 16px;
         }
         .category {
-            border-top: 2px solid #30363d;
-            padding: 20px 30px;
+            border-top: 2px solid #d0d7de;
+            padding: 24px 32px;
+            background-color: #ffffff;
         }
         .category-title {
-            font-size: 20px;
-            font-weight: bold;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #24292f;
         }
         .stock-table {
             width: 100%;
@@ -229,29 +228,32 @@ func generateHTMLReport(results []*StockResult, categoryOrder map[string]int) st
             table-layout: fixed;
         }
         .stock-row {
-            border-bottom: 1px solid #21262d;
+            border-bottom: 1px solid #d0d7de;
         }
         .stock-row:last-child {
             border-bottom: none;
         }
         .stock-row td {
-            padding: 12px 8px;
+            padding: 14px 10px;
+            color: #24292f;
         }
         .stock-name {
-            font-weight: 500;
+            font-weight: 600;
             width: 35%;
             text-align: left;
+            color: #24292f;
         }
         .stock-price {
             text-align: right;
             font-family: 'Courier New', monospace;
-            font-weight: bold;
+            font-weight: 700;
             width: 15%;
+            color: #24292f;
         }
         .stock-change {
             text-align: right;
             font-family: 'Courier New', monospace;
-            font-weight: bold;
+            font-weight: 700;
             width: 18%;
             white-space: nowrap;
         }
@@ -259,34 +261,38 @@ func generateHTMLReport(results []*StockResult, categoryOrder map[string]int) st
             text-align: right;
             font-family: 'Courier New', monospace;
             width: 17%;
+            color: #656d76;
         }
         .stock-status {
             text-align: center;
             font-size: 12px;
-            font-weight: bold;
+            font-weight: 700;
             width: 15%;
         }
-        .positive { color: #3fb950; }
-        .negative { color: #f85149; }
-        .neutral { color: #8b949e; }
+        .stock-row td.positive { color: #1a7f37; }
+        .stock-row td.negative { color: #cf222e; }
+        .stock-row td.neutral { color: #656d76; }
         .oversold {
-            background: #da3633;
-            color: white;
-            padding: 4px 8px;
+            background-color: #cf222e;
+            color: #ffffff;
+            padding: 5px 10px;
             border-radius: 4px;
+            display: inline-block;
         }
         .overbought {
-            background: #3fb950;
-            color: white;
-            padding: 4px 8px;
+            background-color: #1a7f37;
+            color: #ffffff;
+            padding: 5px 10px;
             border-radius: 4px;
+            display: inline-block;
         }
         .footer {
             text-align: center;
             padding: 20px;
-            font-size: 12px;
-            color: #8b949e;
-            border-top: 1px solid #30363d;
+            font-size: 13px;
+            color: #656d76;
+            border-top: 1px solid #d0d7de;
+            background-color: #f6f8fa;
         }
     </style>
 </head>
@@ -298,7 +304,6 @@ func generateHTMLReport(results []*StockResult, categoryOrder map[string]int) st
         </div>
 `)
 
-	// Sort by category
 	sort.Slice(results, func(i, j int) bool {
 		catI := categoryOrder[results[i].Stock.Category]
 		catJ := categoryOrder[results[j].Stock.Category]
@@ -308,7 +313,6 @@ func generateHTMLReport(results []*StockResult, categoryOrder map[string]int) st
 		return results[i].Stock.Name < results[j].Stock.Name
 	})
 
-	// Generate categories
 	currentCategory := ""
 	for _, result := range results {
 		if result.Stock.Category != currentCategory {
@@ -326,7 +330,6 @@ func generateHTMLReport(results []*StockResult, categoryOrder map[string]int) st
 `, emoji, currentCategory))
 		}
 
-		// Stock row
 		changeClass := "neutral"
 		changeIcon := "📊"
 		if result.ChangePercent > 0.01 {
@@ -354,13 +357,11 @@ func generateHTMLReport(results []*StockResult, categoryOrder map[string]int) st
 `, result.Stock.Name, result.CurrentPrice, changeClass, changeIcon, result.ChangePercent, result.RSI, rsiStatus))
 	}
 
-	// Close last category
 	if currentCategory != "" {
 		html.WriteString("        </table>\n")
 		html.WriteString("    </div>\n")
 	}
 
-	// Footer
 	html.WriteString(`    <div class="footer">
             Automatically generated by Stock Analyzer
         </div>
@@ -398,11 +399,8 @@ func getCategoryEmoji(category string) string {
 
 func main() {
 	stocks := []Stock{
-		// Cryptos
 		{Ticker: "BTC-USD", Name: "BTC (USD)", Category: "Cryptos"},
 		{Ticker: "ETH-USD", Name: "ETH (USD)", Category: "Cryptos"},
-
-		// France
 		{Ticker: "MC.PA", Name: "LVMH", Category: "France"},
 		{Ticker: "OR.PA", Name: "L'Oréal", Category: "France"},
 		{Ticker: "AI.PA", Name: "Air Liquide", Category: "France"},
@@ -410,18 +408,12 @@ func main() {
 		{Ticker: "BNP.PA", Name: "BNP Paribas", Category: "France"},
 		{Ticker: "SU.PA", Name: "Schneider Electric S.E.", Category: "France"},
 		{Ticker: "RI.PA", Name: "Pernod Ricard SA", Category: "France"},
-
-		// Energy
 		{Ticker: "TTE.PA", Name: "TotalEnergies", Category: "Energy"},
 		{Ticker: "VST", Name: "Vistra Corp.", Category: "Energy"},
 		{Ticker: "5MVW.DE", Name: "iShares MSCI World Energy", Category: "Energy"},
 		{Ticker: "NUCL.MI", Name: "VanEck Uranium Nuclear", Category: "Energy"},
-
-		// Metals
 		{Ticker: "ISLN.L", Name: "iShares Physical Silver", Category: "Metals"},
 		{Ticker: "SGLD.L", Name: "Invesco Physical Gold", Category: "Metals"},
-
-		// USA
 		{Ticker: "VOO", Name: "Vanguard S&P 500 ETF", Category: "USA"},
 		{Ticker: "NVDA", Name: "NVIDIA", Category: "USA"},
 		{Ticker: "GOOGL", Name: "Alphabet (Google)", Category: "USA"},
@@ -433,20 +425,15 @@ func main() {
 		{Ticker: "CMG", Name: "Chipotle Mexican Grill", Category: "USA"},
 		{Ticker: "MSFT", Name: "Microsoft", Category: "USA"},
 		{Ticker: "CROX", Name: "Crocs Inc.", Category: "USA"},
-
-		// Defense
 		{Ticker: "DFNS.MI", Name: "VanEck Defense UCITS ETF", Category: "Defense"},
 		{Ticker: "LMT", Name: "Lockheed Martin", Category: "Defense"},
 		{Ticker: "KTOS", Name: "Kratos Defense", Category: "Defense"},
 		{Ticker: "PLTR", Name: "Palantir Technologies", Category: "Defense"},
 		{Ticker: "EXA.PA", Name: "Exail Technologies SA", Category: "Defense"},
-
-		// Others
 		{Ticker: "CHDVD.SW", Name: "iShares Swiss Dividend", Category: "Others"},
 		{Ticker: "MCHI", Name: "iShares MSCI China", Category: "Others"},
 	}
 
-	// Fetch all data
 	results := make([]*StockResult, 0)
 	for _, stock := range stocks {
 		result := getStockAnalysis(stock)
@@ -455,7 +442,6 @@ func main() {
 		}
 	}
 
-	// Category order
 	categoryOrder := map[string]int{
 		"Metals":  1,
 		"Cryptos": 2,
@@ -466,7 +452,6 @@ func main() {
 		"Others":  7,
 	}
 
-	// Generate and print HTML
 	htmlReport := generateHTMLReport(results, categoryOrder)
 	fmt.Println(htmlReport)
 }
