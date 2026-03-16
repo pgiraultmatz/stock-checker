@@ -1,0 +1,30 @@
+name: Test Email
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create test message
+        run: |
+          echo "🧪 Test d'envoi d'email depuis GitHub Actions" > test.txt
+          echo "" >> test.txt
+          echo "Si tu reçois cet email, la configuration fonctionne !" >> test.txt
+          echo "" >> test.txt
+          echo "Date: $(date)" >> test.txt
+
+      - name: Send test email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_SENDER }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: 🧪 Test - GitHub Actions Email
+          body: file://test.txt
+          to: ${{ secrets.EMAIL_RECIPIENT }}
+          from: Stock Analyzer <${{ secrets.EMAIL_SENDER }}>
+          content_type: text/plain
+          secure: true
