@@ -2,7 +2,7 @@ name: Daily Stock Report
 
 on:
   schedule:
-    - cron: '0 7 * * *'
+    - cron: '0 7 * * *'  # Every day at 8am Paris time
   workflow_dispatch:
 
 jobs:
@@ -23,12 +23,12 @@ jobs:
 
       - name: Run stock analysis
         run: |
-          echo "📊 Génération du rapport boursier..."
-          CGO_ENABLED=0 go run main.go > report.txt
-          echo "✅ Rapport généré ($(wc -l < report.txt) lignes)"
+          echo "📊 Generating stock market report..."
+          CGO_ENABLED=0 go run main.go > report.html
+          echo "✅ HTML report generated ($(wc -c < report.html) bytes)"
           echo ""
-          echo "Aperçu des 30 premières lignes:"
-          head -30 report.txt
+          echo "Preview (first 50 lines):"
+          head -50 report.html
 
       - name: Send email report
         uses: dawidd6/action-send-mail@v3
@@ -37,9 +37,9 @@ jobs:
           server_port: 465
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: 📊 Rapport Boursier du $(date +%d/%m/%Y)
-          body: file://report.txt
+          subject: 📊 Stock Market Report - $(date +%d/%m/%Y)
+          body: file://report.html
           to: ${{ secrets.EMAIL_RECIPIENT }}
           from: Stock Analyzer <${{ secrets.EMAIL_USERNAME }}>
-          content_type: text/plain
+          content_type: text/html
           secure: true
