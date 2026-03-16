@@ -20,11 +20,11 @@ jobs:
         with:
           server_address: smtp.gmail.com
           server_port: 465
-          username: ${{ secrets.EMAIL_SENDER }}
+          username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
           subject: 🧪 Test - GitHub Actions Email
           body: file://test.txt
           to: ${{ secrets.EMAIL_RECIPIENT }}
-          from: Stock Analyzer <${{ secrets.EMAIL_SENDER }}>
+          from: Stock Analyzer <${{ secrets.EMAIL_USERNAME }}>
           content_type: text/plain
           secure: true
