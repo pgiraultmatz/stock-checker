@@ -32,7 +32,9 @@ jobs:
 
       - name: Set date
         id: date
-        run: echo "TODAY=$(date +'%d/%m/%Y')" >> $GITHUB_OUTPUT
+        run: |
+          echo "TODAY=$(date +'%d/%m/%Y')" >> $GITHUB_OUTPUT
+          echo "TODAY_SAFE=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
 
       - name: Run stock analysis
         run: |
@@ -57,6 +59,6 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: stock-report-${{ steps.date.outputs.TODAY }}
+          name: stock-report-${{ steps.date.outputs.TODAY_SAFE }}
           path: report.html
           retention-days: 30
