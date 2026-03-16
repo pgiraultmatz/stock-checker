@@ -272,20 +272,6 @@ func generateHTMLReport(results []*StockResult, categoryOrder map[string]int) st
         .stock-row td.positive { color: #1a7f37; }
         .stock-row td.negative { color: #cf222e; }
         .stock-row td.neutral { color: #656d76; }
-        .oversold {
-            background-color: #cf222e;
-            color: #ffffff;
-            padding: 5px 10px;
-            border-radius: 4px;
-            display: inline-block;
-        }
-        .overbought {
-            background-color: #1a7f37;
-            color: #ffffff;
-            padding: 5px 10px;
-            border-radius: 4px;
-            display: inline-block;
-        }
         .footer {
             text-align: center;
             padding: 20px;
@@ -342,9 +328,9 @@ func generateHTMLReport(results []*StockResult, categoryOrder map[string]int) st
 
 		rsiStatus := ""
 		if result.RSI < 30 {
-			rsiStatus = `<span class="oversold">🔴 OVERSOLD</span>`
+			rsiStatus = `<span style="color: #cf222e; font-weight: 700; font-size: 11px;">🔴 OVERSOLD</span>`
 		} else if result.RSI > 70 {
-			rsiStatus = `<span class="overbought">🟢 OVERBOUGHT</span>`
+			rsiStatus = `<span style="color: #1a7f37; font-weight: 700; font-size: 11px;">🟢 OVERBOUGHT</span>`
 		}
 
 		html.WriteString(fmt.Sprintf(`            <tr class="stock-row">
