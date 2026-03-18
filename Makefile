@@ -1,4 +1,4 @@
-.PHONY: build run test clean lint fmt help
+.PHONY: build run test clean lint fmt help report report-mock
 
 # Go parameters
 GOCMD=go
@@ -56,6 +56,11 @@ endif
 report: build
 	@./$(BINARY_NAME) -config $(CONFIG_PATH) -output report.html -verbose
 	@echo "Report saved to report.html"
+
+## report-mock: Generate HTML report using mock data (no API calls)
+report-mock: build
+	@./$(BINARY_NAME) -mock -output report.html -verbose
+	@echo "Mock report saved to report.html"
 
 ## test: Run all tests
 test:
