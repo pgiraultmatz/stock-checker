@@ -42,5 +42,7 @@ Thumbs.db
 *.bak
 *.log
 
+.claude
+
 # Generated reports (root level only)
 /report.html

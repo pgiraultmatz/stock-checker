@@ -13,6 +13,7 @@ import (
 	"os"
 	"time"
 
+	"stock-checker/internal/ai"
 	"stock-checker/internal/config"
 	"stock-checker/internal/models"
 	"stock-checker/internal/report"
@@ -22,6 +23,7 @@ import (
 func main() {
 	// Parse command line flags
 	configPath := flag.String("config", "config.json", "Path to configuration file")
+	promptPath := flag.String("prompt", "manual_prompt.txt", "Path to manual prompt template file")
 	outputPath := flag.String("output", "", "Path to output HTML file (defaults to stdout)")
 	check := flag.Bool("check", false, "Check a single stock (use -ticker to specify, random otherwise)")
 	ticker := flag.String("ticker", "", "Ticker symbol to check (implies -check)")
@@ -58,7 +60,7 @@ func main() {
 	}
 
 	// Full report mode
-	if err := runFullReport(ctx, cfg, *outputPath, logger); err != nil {
+	if err := runFullReport(ctx, cfg, *outputPath, *promptPath, logger); err != nil {
 		logger.Error("analysis failed", "error", err)
 		os.Exit(1)
 	}
@@ -136,7 +138,7 @@ func printStockResult(r *models.StockResult) {
 	fmt.Println()
 }
 
-func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, logger *slog.Logger) error {
+func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, promptPath string, logger *slog.Logger) error {
 	logger.Info("starting stock analysis",
 		"stocks", len(cfg.Stocks),
 		"concurrency", cfg.Concurrency,
@@ -159,13 +161,50 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, l
 		return fmt.Errorf("no stocks were successfully analyzed")
 	}
 
+	// Run AI analysis if enabled
+	var aiAnalysis *ai.Analysis
+	var manualPrompt string
+	if cfg.AI.Enabled {
+		if cfg.AI.Mode == "manual_prompt" {
+			var err error
+			manualPrompt, err = ai.BuildPrompt(results, promptPath)
+			if err != nil {
+				logger.Warn("failed to build manual prompt, continuing without it", "error", err)
+			} else {
+				logger.Info("manual prompt mode: prompt generated for copy-paste")
+			}
+		} else {
+			apiKey, provider := getAICredentials(cfg.AI.Provider)
+			if apiKey != "" {
+				logger.Info("running AI analysis", "provider", provider)
+
+				aiClient := ai.NewClient(ai.ClientConfig{
+					Provider: provider,
+					APIKey:   apiKey,
+					Model:    cfg.AI.Model,
+				})
+				aiAnalyzer := ai.NewAnalyzer(aiClient)
+
+				var err error
+				aiAnalysis, err = aiAnalyzer.Analyze(ctx, results)
+				if err != nil {
+					logger.Warn("AI analysis failed, continuing without it", "error", err)
+				} else {
+					logger.Info("AI analysis complete")
+				}
+			} else {
+				logger.Warn("AI analysis enabled but no API key found", "provider", cfg.AI.Provider)
+			}
+		}
+	}
+
 	// Generate HTML report
 	generator, err := report.NewGenerator(cfg.GetCategoryEmoji(), cfg.GetCategoryOrder())
 	if err != nil {
 		return fmt.Errorf("creating report generator: %w", err)
 	}
 
-	htmlReport, err := generator.Generate(results)
+	htmlReport, err := generator.GenerateWithAI(results, aiAnalysis, manualPrompt)
 	if err != nil {
 		return fmt.Errorf("generating report: %w", err)
 	}
@@ -181,4 +220,32 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, l
 	}
 
 	return nil
+}
+
+// getAICredentials returns the API key and provider based on config and environment.
+// It checks environment variables in order: configured provider first, then fallbacks.
+func getAICredentials(configuredProvider string) (string, ai.Provider) {
+	// Map of providers to their environment variable names
+	providerEnvVars := map[ai.Provider]string{
+		ai.ProviderGemini:    "GEMINI_API_KEY",
+		ai.ProviderAnthropic: "ANTHROPIC_API_KEY",
+	}
+
+	// Try configured provider first
+	provider := ai.Provider(configuredProvider)
+	if envVar, ok := providerEnvVars[provider]; ok {
+		if apiKey := os.Getenv(envVar); apiKey != "" {
+			return apiKey, provider
+		}
+	}
+
+	// Fallback: try all providers in order
+	fallbackOrder := []ai.Provider{ai.ProviderGemini, ai.ProviderAnthropic}
+	for _, p := range fallbackOrder {
+		if apiKey := os.Getenv(providerEnvVars[p]); apiKey != "" {
+			return apiKey, p
+		}
+	}
+
+	return "", ai.Provider(configuredProvider)
 }

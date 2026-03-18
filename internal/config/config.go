@@ -15,7 +15,17 @@ type Config struct {
 	Stocks      []models.Stock    `json:"stocks"`
 	Categories  []models.Category `json:"categories"`
 	YahooAPI    YahooAPIConfig    `json:"yahoo_api"`
+	AI          AIConfig          `json:"ai"`
 	Concurrency int               `json:"concurrency"`
+}
+
+// AIConfig holds AI/Anthropic API configuration.
+type AIConfig struct {
+	Enabled   bool   `json:"enabled"`
+	Mode      string `json:"mode"`     // "api" or "manual_prompt" (default: "manual_prompt")
+	Provider  string `json:"provider"` // "gemini" or "anthropic"
+	Model     string `json:"model"`
+	MaxTokens int    `json:"max_tokens"`
 }
 
 // YahooAPIConfig holds Yahoo Finance API configuration.
@@ -36,6 +46,13 @@ func DefaultConfig() *Config {
 			Interval:  "1wk",
 			UserAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
 			Timeout:   30,
+		},
+		AI: AIConfig{
+			Enabled:   true,
+			Mode:      "manual_prompt",
+			Provider:  "gemini",
+			Model:     "gemini-2.0-flash",
+			MaxTokens: 2000,
 		},
 		Concurrency: 10,
 		Categories: []models.Category{
