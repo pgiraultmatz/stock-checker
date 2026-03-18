@@ -29,6 +29,7 @@ func main() {
 	ticker := flag.String("ticker", "", "Ticker symbol to check (implies -check)")
 	verbose := flag.Bool("verbose", false, "Enable verbose logging")
 	timeout := flag.Duration("timeout", 5*time.Minute, "Timeout for the entire operation")
+	mock := flag.Bool("mock", false, "Use mock data instead of fetching from APIs (for testing report generation)")
 	flag.Parse()
 
 	// Setup logging
@@ -50,6 +51,15 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 	defer cancel()
 
+	// Mock report mode: skip Yahoo Finance API, generate manual prompt from mock data
+	if *mock {
+		if err := runMockReport(*outputPath, *promptPath, logger); err != nil {
+			logger.Error("mock report failed", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	// Single stock check mode (triggered by -check or -ticker)
 	if *check || *ticker != "" {
 		if err := runSingleCheck(ctx, cfg, *ticker, logger); err != nil {
@@ -64,6 +74,43 @@ func main() {
 		logger.Error("analysis failed", "error", err)
 		os.Exit(1)
 	}
+}
+
+func runMockReport(outputPath string, promptPath string, logger *slog.Logger) error {
+	logger.Info("generating mock report with manual prompt (no API calls)")
+
+	results := mockStockResults()
+
+	manualPrompt, err := ai.BuildPrompt(results, promptPath)
+	if err != nil {
+		logger.Warn("failed to build manual prompt, continuing without it", "error", err)
+	} else {
+		logger.Info("manual prompt generated for copy-paste")
+	}
+
+	generator, err := report.NewGenerator(
+		map[string]string{"Tech": "zap", "Finance": "shield", "Energy": "us", "Crypto": "bitcoin"},
+		map[string]int{"Tech": 1, "Finance": 2, "Energy": 3, "Crypto": 4},
+	)
+	if err != nil {
+		return fmt.Errorf("creating report generator: %w", err)
+	}
+
+	htmlReport, err := generator.GenerateWithAI(results, nil, manualPrompt)
+	if err != nil {
+		return fmt.Errorf("generating mock report: %w", err)
+	}
+
+	if outputPath != "" {
+		if err := os.WriteFile(outputPath, []byte(htmlReport), 0644); err != nil {
+			return fmt.Errorf("writing mock report to file: %w", err)
+		}
+		logger.Info("mock report written", "path", outputPath)
+	} else {
+		fmt.Println(htmlReport)
+	}
+
+	return nil
 }
 
 func runSingleCheck(ctx context.Context, cfg *config.Config, ticker string, logger *slog.Logger) error {

@@ -479,6 +479,14 @@
             margin: 0 auto;
         }
 
+        .prompt-hint {
+            display: inline-block;
+            margin-top: 12px;
+            font-size: 12px;
+            opacity: 0.75;
+            font-style: italic;
+        }
+
         .prompt-content {
             padding: 24px;
         }
@@ -494,7 +502,14 @@
             overflow-x: auto;
             white-space: pre-wrap;
             word-break: break-word;
-            border: 1px solid #313244;
+            border: 2px solid #313244;
+            outline: none;
+            cursor: text;
+        }
+
+        .prompt-code:focus {
+            border-color: #9a6dd7;
+            box-shadow: 0 0 0 3px rgba(110, 64, 201, 0.25);
         }
 
         /* Footer */
@@ -689,9 +704,10 @@
             <div class="prompt-header">
                 <h2>💬 Prompt pour analyse IA</h2>
                 <p>Copiez-collez ce prompt dans Claude (ou un autre modèle) pour obtenir votre analyse de marché.</p>
+                <span class="prompt-hint">Cliquez sur le bloc puis Ctrl+A / Cmd+A pour tout sélectionner</span>
             </div>
             <div class="prompt-content">
-                <pre class="prompt-code">{{.ManualPrompt}}</pre>
+                <pre class="prompt-code" tabindex="0">{{.ManualPrompt}}</pre>
             </div>
         </div>
         {{end}}
