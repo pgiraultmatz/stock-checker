@@ -37,6 +37,8 @@ jobs:
           echo "TODAY_SAFE=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
 
       - name: Run stock analysis
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           echo "📊 Generating stock market report..."
           ./stock-checker -config config.json -output report.html -verbose

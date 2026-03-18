@@ -50,5 +50,12 @@
     "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
     "timeout_seconds": 30
   },
+  "ai": {
+    "enabled": true,
+    "mode": "manual_prompt",
+    "provider": "gemini",
+    "model": "gemini-2.0-flash",
+    "max_tokens": 2000
+  },
   "concurrency": 10
 }
