@@ -67,6 +67,10 @@ prompt-twitter: build
 	@echo "Twitter prompt saved to prompt-twitter.txt"
 	@command -v pbcopy >/dev/null 2>&1 && cat prompt-twitter.txt | pbcopy && echo "Copied to clipboard" || true
 
+## check-alerts: Check intraday price alerts (writes alerts.html only if triggered)
+check-alerts: build
+	@./$(BINARY_NAME) -config $(CONFIG_PATH) -check-alerts -alerts-output alerts.html -verbose
+
 ## report-mock: Generate HTML report using mock data (no API calls)
 report-mock: build
 	@./$(BINARY_NAME) -mock -output report.html -verbose

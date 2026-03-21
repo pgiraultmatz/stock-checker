@@ -46,5 +46,7 @@ Thumbs.db
 
 # Generated reports and prompts (root level only)
 /report.html
+/alerts.html
 /prompt.txt
 /prompt-twitter.txt
+/.alert-state.json
