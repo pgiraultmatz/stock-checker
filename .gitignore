@@ -44,5 +44,7 @@ Thumbs.db
 
 .claude
 
-# Generated reports (root level only)
+# Generated reports and prompts (root level only)
 /report.html
+/prompt.txt
+/prompt-twitter.txt

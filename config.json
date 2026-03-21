@@ -57,5 +57,16 @@
     "model": "gemini-2.0-flash",
     "max_tokens": 2000
   },
+  "twitter": {
+    "enabled": true,
+    "max_tweets": 5,
+    "provider": "nitter",
+    "nitter_instances": [
+      "https://nitter.net",
+      "https://nitter.privacydev.net",
+      "https://nitter.poast.org",
+      "https://nitter.tiekoetter.com"
+    ]
+  },
   "concurrency": 10
 }

@@ -39,6 +39,7 @@ jobs:
       - name: Run stock analysis
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TWITTER_USERNAMES: ${{ secrets.TWITTER_USERNAMES }}
         run: |
           echo "📊 Generating stock market report..."
           ./stock-checker -config config.json -output report.html -verbose

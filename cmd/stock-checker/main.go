@@ -11,12 +11,14 @@ import (
 	"log/slog"
 	"math/rand"
 	"os"
+	"strings"
 	"time"
 
 	"stock-checker/internal/ai"
 	"stock-checker/internal/config"
 	"stock-checker/internal/models"
 	"stock-checker/internal/report"
+	"stock-checker/internal/twitter"
 	"stock-checker/internal/yahoo"
 )
 
@@ -24,12 +26,15 @@ func main() {
 	// Parse command line flags
 	configPath := flag.String("config", "config.json", "Path to configuration file")
 	promptPath := flag.String("prompt", "manual_prompt.txt", "Path to manual prompt template file")
+	twitterPromptPath := flag.String("twitter-prompt", "twitter_prompt.txt", "Path to Twitter-only prompt template file")
 	outputPath := flag.String("output", "", "Path to output HTML file (defaults to stdout)")
+	promptOutput := flag.String("prompt-output", "", "Path to write the generated prompt (optional)")
 	check := flag.Bool("check", false, "Check a single stock (use -ticker to specify, random otherwise)")
 	ticker := flag.String("ticker", "", "Ticker symbol to check (implies -check)")
 	verbose := flag.Bool("verbose", false, "Enable verbose logging")
 	timeout := flag.Duration("timeout", 5*time.Minute, "Timeout for the entire operation")
 	mock := flag.Bool("mock", false, "Use mock data instead of fetching from APIs (for testing report generation)")
+	twitterOnly := flag.Bool("twitter-only", false, "Fetch tweets and output a standalone analysis prompt (no Yahoo Finance)")
 	flag.Parse()
 
 	// Setup logging
@@ -51,9 +56,21 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 	defer cancel()
 
+	// Twitter-only mode: fetch tweets and output a standalone prompt, skip Yahoo Finance entirely
+	if *twitterOnly {
+		if err := runTwitterPrompt(ctx, cfg, *twitterPromptPath, *promptOutput, logger); err != nil {
+			logger.Error("twitter prompt failed", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Fetch tweets if configured
+	twitterContext := fetchTwitterContext(ctx, cfg, logger)
+
 	// Mock report mode: skip Yahoo Finance API, generate manual prompt from mock data
 	if *mock {
-		if err := runMockReport(*outputPath, *promptPath, logger); err != nil {
+		if err := runMockReport(*outputPath, *promptPath, twitterContext, logger); err != nil {
 			logger.Error("mock report failed", "error", err)
 			os.Exit(1)
 		}
@@ -70,18 +87,18 @@ func main() {
 	}
 
 	// Full report mode
-	if err := runFullReport(ctx, cfg, *outputPath, *promptPath, logger); err != nil {
+	if err := runFullReport(ctx, cfg, *outputPath, *promptOutput, *promptPath, twitterContext, logger); err != nil {
 		logger.Error("analysis failed", "error", err)
 		os.Exit(1)
 	}
 }
 
-func runMockReport(outputPath string, promptPath string, logger *slog.Logger) error {
+func runMockReport(outputPath string, promptPath string, twitterContext string, logger *slog.Logger) error {
 	logger.Info("generating mock report with manual prompt (no API calls)")
 
 	results := mockStockResults()
 
-	manualPrompt, err := ai.BuildPrompt(results, promptPath)
+	manualPrompt, err := ai.BuildPrompt(results, promptPath, twitterContext)
 	if err != nil {
 		logger.Warn("failed to build manual prompt, continuing without it", "error", err)
 	} else {
@@ -185,7 +202,7 @@ func printStockResult(r *models.StockResult) {
 	fmt.Println()
 }
 
-func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, promptPath string, logger *slog.Logger) error {
+func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, promptOutput string, promptPath string, twitterContext string, logger *slog.Logger) error {
 	logger.Info("starting stock analysis",
 		"stocks", len(cfg.Stocks),
 		"concurrency", cfg.Concurrency,
@@ -214,11 +231,18 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, p
 	if cfg.AI.Enabled {
 		if cfg.AI.Mode == "manual_prompt" {
 			var err error
-			manualPrompt, err = ai.BuildPrompt(results, promptPath)
+			manualPrompt, err = ai.BuildPrompt(results, promptPath, twitterContext)
 			if err != nil {
 				logger.Warn("failed to build manual prompt, continuing without it", "error", err)
 			} else {
 				logger.Info("manual prompt mode: prompt generated for copy-paste")
+				if promptOutput != "" {
+					if err := os.WriteFile(promptOutput, []byte(manualPrompt), 0644); err != nil {
+						logger.Warn("failed to write prompt to file", "path", promptOutput, "error", err)
+					} else {
+						logger.Info("prompt written", "path", promptOutput)
+					}
+				}
 			}
 		} else {
 			apiKey, provider := getAICredentials(cfg.AI.Provider)
@@ -233,7 +257,7 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, p
 				aiAnalyzer := ai.NewAnalyzer(aiClient)
 
 				var err error
-				aiAnalysis, err = aiAnalyzer.Analyze(ctx, results)
+				aiAnalysis, err = aiAnalyzer.Analyze(ctx, results, twitterContext)
 				if err != nil {
 					logger.Warn("AI analysis failed, continuing without it", "error", err)
 				} else {
@@ -267,6 +291,79 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, p
 	}
 
 	return nil
+}
+
+// runTwitterPrompt fetches tweets from all users in TWITTER_USERNAMES and writes
+// a standalone analysis prompt to promptOutput (or stdout if empty).
+func runTwitterPrompt(ctx context.Context, cfg *config.Config, templatePath string, promptOutput string, logger *slog.Logger) error {
+	twitterContext := fetchTwitterContext(ctx, cfg, logger)
+	if twitterContext == "" {
+		return fmt.Errorf("no tweets fetched — check TWITTER_USERNAMES and twitter config")
+	}
+
+	template, err := os.ReadFile(templatePath)
+	if err != nil {
+		return fmt.Errorf("reading twitter prompt template %q: %w", templatePath, err)
+	}
+
+	prompt := string(template) + twitterContext
+
+	if promptOutput != "" {
+		if err := os.WriteFile(promptOutput, []byte(prompt), 0644); err != nil {
+			return fmt.Errorf("writing twitter prompt to file: %w", err)
+		}
+		logger.Info("twitter prompt written", "path", promptOutput)
+	} else {
+		fmt.Println(prompt)
+	}
+	return nil
+}
+
+// fetchTwitterContext fetches recent tweets from all users listed in the
+// TWITTER_USERNAMES environment variable (comma-separated) and returns them
+// formatted as a single string for inclusion in the AI prompt.
+// Returns an empty string if Twitter is disabled or no usernames are set.
+func fetchTwitterContext(ctx context.Context, cfg *config.Config, logger *slog.Logger) string {
+	if !cfg.Twitter.Enabled {
+		return ""
+	}
+
+	usernamesEnv := os.Getenv("TWITTER_USERNAMES")
+	if usernamesEnv == "" {
+		logger.Warn("twitter enabled but TWITTER_USERNAMES not set, skipping")
+		return ""
+	}
+	usernames := strings.Split(usernamesEnv, ",")
+
+	maxTweets := cfg.Twitter.MaxTweets
+	if maxTweets <= 0 {
+		maxTweets = 5
+	}
+
+	fetcher, err := twitter.NewFetcher(cfg.Twitter.Provider, os.Getenv("TWITTER_BEARER_TOKEN"), cfg.Twitter.NitterInstances)
+	if err != nil {
+		logger.Warn("twitter fetcher init failed, skipping", "error", err)
+		return ""
+	}
+
+	var sections []string
+	for _, username := range usernames {
+		username = strings.TrimSpace(username)
+		if username == "" {
+			continue
+		}
+		tweets, err := fetcher.GetRecentTweets(ctx, username, maxTweets)
+		if err != nil {
+			logger.Warn("failed to fetch tweets", "user", username, "error", err)
+			continue
+		}
+		logger.Info("tweets fetched", "provider", cfg.Twitter.Provider, "user", username, "count", len(tweets))
+		if section := twitter.FormatTweets(username, tweets); section != "" {
+			sections = append(sections, section)
+		}
+	}
+
+	return strings.Join(sections, "\n")
 }
 
 // getAICredentials returns the API key and provider based on config and environment.

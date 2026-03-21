@@ -70,20 +70,42 @@ Tu dois TOUJOURS répondre en JSON valide selon le format demandé.`
 
 // BuildPrompt returns the formatted prompt to copy-paste into Claude or any other model.
 // It reads the template from promptPath and appends the stock data.
-func BuildPrompt(results []*models.StockResult, promptPath string) (string, error) {
+// If twitterContext is non-empty, it is added as a separate clearly delimited section.
+func BuildPrompt(results []*models.StockResult, promptPath string, twitterContext string) (string, error) {
 	template, err := os.ReadFile(promptPath)
 	if err != nil {
 		return "", fmt.Errorf("reading prompt template %q: %w", promptPath, err)
 	}
 	var a Analyzer
 	stockData := a.prepareStockData(results)
-	return string(template) + stockData, nil
+
+	var sb strings.Builder
+	sb.WriteString("════════════════════════════════════════\n")
+	sb.WriteString("SECTION 1 — DONNÉES DE MARCHÉ\n")
+	sb.WriteString("════════════════════════════════════════\n\n")
+	sb.WriteString(string(template))
+	sb.WriteString(stockData)
+
+	if twitterContext != "" {
+		sb.WriteString("\n\n════════════════════════════════════════\n")
+		sb.WriteString("SECTION 2 — SENTIMENT DES TRADERS\n")
+		sb.WriteString("════════════════════════════════════════\n\n")
+		sb.WriteString(twitterContext)
+	}
+
+	return sb.String(), nil
 }
 
 // Analyze performs AI analysis on stock results.
-func (a *Analyzer) Analyze(ctx context.Context, results []*models.StockResult) (*Analysis, error) {
+// twitterContext is optional: if non-empty, it is included in the prompt as additional context.
+func (a *Analyzer) Analyze(ctx context.Context, results []*models.StockResult, twitterContext string) (*Analysis, error) {
 	// Prepare stock data for the prompt
 	stockData := a.prepareStockData(results)
+
+	twitterSection := ""
+	if twitterContext != "" {
+		twitterSection = "\n\nContexte additionnel — analyses récentes d'un trader quantitatif crypto:\n" + twitterContext
+	}
 
 	userPrompt := fmt.Sprintf(`Analyse ces données de marché et fournis:
 
@@ -106,7 +128,7 @@ Réponds UNIQUEMENT en JSON valide avec cette structure exacte:
     {"ticker": "XXX", "name": "Nom", "action": "buy|sell|hold|watch", "reason": "Raison courte", "risk": "low|medium|high"}
   ],
   "market_summary": "Résumé en 1-2 phrases de la situation globale du portefeuille"
-}`, stockData)
+}`, stockData+twitterSection)
 
 	response, err := a.client.Complete(ctx, systemPrompt, userPrompt, 2000)
 	if err != nil {

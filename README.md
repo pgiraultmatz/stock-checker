@@ -70,10 +70,23 @@ cd stock-checker
 go mod download
 ```
 
-3. **Run locally**
+3. **Set environment variables**
 
 ```bash
-CGO_ENABLED=0 go run main.go > report.html
+export GEMINI_API_KEY=your_gemini_key        # or ANTHROPIC_API_KEY
+export TWITTER_BEARER_TOKEN=your_bearer_token # optional, for Twitter/X context
+```
+
+4. **Run locally**
+
+```bash
+make run
+```
+
+This builds the binary and runs the full analysis. To generate an HTML report file:
+
+```bash
+make report
 open report.html
 ```
 
@@ -111,3 +124,50 @@ stocks := []Stock{
 | German Stock | `5MVW.DE` | Ticker + `.DE` (Frankfurt) |
 | London Stock | `SGLD.L` | Ticker + `.L` (London) |
 | Crypto | `BTC-USD` | Crypto + `-USD` |
+
+### Twitter/X Context (optional)
+
+Enrich the AI prompt with recent tweets from a quantitative crypto trader.
+Two providers are supported: **Nitter** (no credentials needed) and **Twitter API v2**.
+
+The list of Twitter accounts to follow is set via the `TWITTER_USERNAMES` environment variable (comma-separated) — kept out of `config.json` to avoid committing usernames to the repository.
+
+#### Provider: Nitter (recommended)
+
+Nitter is an open-source Twitter mirror that exposes RSS feeds — no API key required.
+
+```json
+"twitter": {
+  "enabled": true,
+  "max_tweets": 5,
+  "provider": "nitter",
+  "nitter_instance": "https://nitter.poast.org"
+}
+```
+
+```bash
+export TWITTER_USERNAMES=trader1,trader2,trader3
+make run
+```
+
+> **Note:** Nitter instances can go down or get blocked by Twitter. If `nitter.poast.org` stops working, replace `nitter_instance` with another instance from the [Nitter instance list](https://github.com/zedeus/nitter/wiki/Instances).
+
+#### Provider: Twitter API v2
+
+Requires a Bearer Token from the [Twitter Developer Portal](https://developer.twitter.com/en/portal/dashboard) (free Basic tier is sufficient).
+
+```json
+"twitter": {
+  "enabled": true,
+  "max_tweets": 5,
+  "provider": "api"
+}
+```
+
+```bash
+export TWITTER_USERNAMES=trader1,trader2,trader3
+export TWITTER_BEARER_TOKEN=your_bearer_token
+make run
+```
+
+If fetching fails for any reason, the program continues without Twitter context.

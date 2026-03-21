@@ -16,6 +16,7 @@ type Config struct {
 	Categories  []models.Category `json:"categories"`
 	YahooAPI    YahooAPIConfig    `json:"yahoo_api"`
 	AI          AIConfig          `json:"ai"`
+	Twitter     TwitterConfig     `json:"twitter"`
 	Concurrency int               `json:"concurrency"`
 }
 
@@ -26,6 +27,16 @@ type AIConfig struct {
 	Provider  string `json:"provider"` // "gemini" or "anthropic"
 	Model     string `json:"model"`
 	MaxTokens int    `json:"max_tokens"`
+}
+
+// TwitterConfig holds Twitter/X fetching configuration.
+// The list of usernames to follow is read from the TWITTER_USERNAMES environment
+// variable (comma-separated) to avoid committing them to the repository.
+type TwitterConfig struct {
+	Enabled        bool   `json:"enabled"`
+	MaxTweets      int    `json:"max_tweets"`
+	Provider        string   `json:"provider"`         // "nitter" (default) or "api"
+	NitterInstances []string `json:"nitter_instances"` // tried in order until one works
 }
 
 // YahooAPIConfig holds Yahoo Finance API configuration.
