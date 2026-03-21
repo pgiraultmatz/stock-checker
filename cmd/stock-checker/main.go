@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"stock-checker/internal/ai"
+	"stock-checker/internal/alerts"
 	"stock-checker/internal/config"
 	"stock-checker/internal/models"
 	"stock-checker/internal/report"
@@ -34,7 +35,10 @@ func main() {
 	verbose := flag.Bool("verbose", false, "Enable verbose logging")
 	timeout := flag.Duration("timeout", 5*time.Minute, "Timeout for the entire operation")
 	mock := flag.Bool("mock", false, "Use mock data instead of fetching from APIs (for testing report generation)")
-	twitterOnly := flag.Bool("twitter-only", false, "Fetch tweets and output a standalone analysis prompt (no Yahoo Finance)")
+	twitterOnly  := flag.Bool("twitter-only", false, "Fetch tweets and output a standalone analysis prompt (no Yahoo Finance)")
+	checkAlerts  := flag.Bool("check-alerts", false, "Check intraday price alerts and write report if any are triggered")
+	alertsOutput := flag.String("alerts-output", "alerts.html", "Path to write the alerts HTML report")
+	cryptoOnly   := flag.Bool("crypto-only", false, "Restrict alert checks to crypto assets only (for off-market-hours runs)")
 	flag.Parse()
 
 	// Setup logging
@@ -55,6 +59,15 @@ func main() {
 	// Create context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 	defer cancel()
+
+	// Price alert mode: check intraday variations, write report only if new alerts triggered
+	if *checkAlerts {
+		if err := runAlerts(ctx, cfg, *alertsOutput, *cryptoOnly, logger); err != nil {
+			logger.Error("alert check failed", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	// Twitter-only mode: fetch tweets and output a standalone prompt, skip Yahoo Finance entirely
 	if *twitterOnly {
@@ -290,6 +303,115 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, p
 		fmt.Println(htmlReport)
 	}
 
+	return nil
+}
+
+// runAlerts checks intraday price variations against configured thresholds.
+// It writes an HTML report to outputPath only when new (not yet sent today) alerts are triggered.
+func runAlerts(ctx context.Context, cfg *config.Config, outputPath string, cryptoOnly bool, logger *slog.Logger) error {
+	if !cfg.Alerts.Enabled {
+		logger.Info("alerts disabled in config, skipping")
+		return nil
+	}
+
+	statePath := cfg.Alerts.StatePath
+	if statePath == "" {
+		statePath = ".alert-state.json"
+	}
+
+	// Build lookup map and ticker list (override or all stocks)
+	stockMap := make(map[string]models.Stock, len(cfg.Stocks))
+	for _, s := range cfg.Stocks {
+		stockMap[s.Ticker] = s
+	}
+	tickers := cfg.Alerts.Tickers
+	if len(tickers) == 0 {
+		tickers = make([]string, len(cfg.Stocks))
+		for i, s := range cfg.Stocks {
+			tickers[i] = s.Ticker
+		}
+	}
+
+	// Filter to crypto-only when explicitly requested or on weekends
+	isWeekend := time.Now().Weekday() == time.Saturday || time.Now().Weekday() == time.Sunday
+	if cryptoOnly || isWeekend {
+		filtered := tickers[:0]
+		for _, t := range tickers {
+			if s, ok := stockMap[t]; ok && s.Category == "Cryptos" {
+				filtered = append(filtered, t)
+			}
+		}
+		tickers = filtered
+		if cryptoOnly {
+			logger.Info("crypto-only mode: checking crypto assets only", "tickers", tickers)
+		} else {
+			logger.Info("weekend: checking crypto only", "tickers", tickers)
+		}
+	}
+
+	// Fetch intraday prices concurrently
+	client := yahoo.NewClient(cfg.YahooAPI)
+	type result struct {
+		price *yahoo.IntradayPrice
+		err   error
+	}
+	ch := make(chan result, len(tickers))
+	for _, ticker := range tickers {
+		go func(t string) {
+			p, err := client.GetIntradayPrice(ctx, t)
+			ch <- result{p, err}
+		}(ticker)
+	}
+
+	prices := make([]alerts.IntradayPrice, 0, len(tickers))
+	for range tickers {
+		r := <-ch
+		if r.err != nil {
+			logger.Warn("failed to fetch intraday price", "error", r.err)
+			continue
+		}
+		if r.price.Stale {
+			logger.Debug("skipping stale data (market not yet open)", "ticker", r.price.Ticker)
+			continue
+		}
+		stock := stockMap[r.price.Ticker]
+		prices = append(prices, alerts.IntradayPrice{
+			Stock:         stock,
+			OpenPrice:     r.price.OpenPrice,
+			CurrentPrice:  r.price.CurrentPrice,
+			ChangePercent: r.price.ChangePercent,
+		})
+	}
+
+	// Load state and check for new alerts
+	state, err := alerts.LoadState(statePath)
+	if err != nil {
+		return fmt.Errorf("loading alert state: %w", err)
+	}
+
+	triggered := alerts.Check(prices, cfg.Alerts.Thresholds, state)
+
+	// Always save state (even if no new alerts, to persist MarkSent calls)
+	if err := state.Save(statePath); err != nil {
+		logger.Warn("failed to save alert state", "error", err)
+	}
+
+	if len(triggered) == 0 {
+		logger.Info("no new price alerts triggered")
+		return nil
+	}
+
+	logger.Info("price alerts triggered", "count", len(triggered))
+	for _, a := range triggered {
+		logger.Info("alert", "ticker", a.Stock.Ticker, "change", fmt.Sprintf("%.2f%%", a.ChangePercent), "threshold", a.Threshold)
+	}
+
+	// Write HTML report
+	html := alerts.GenerateReport(triggered)
+	if err := os.WriteFile(outputPath, []byte(html), 0644); err != nil {
+		return fmt.Errorf("writing alerts report: %w", err)
+	}
+	logger.Info("alerts report written", "path", outputPath)
 	return nil
 }
 

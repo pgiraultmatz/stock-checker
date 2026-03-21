@@ -17,6 +17,7 @@ type Config struct {
 	YahooAPI    YahooAPIConfig    `json:"yahoo_api"`
 	AI          AIConfig          `json:"ai"`
 	Twitter     TwitterConfig     `json:"twitter"`
+	Alerts      AlertConfig       `json:"alerts"`
 	Concurrency int               `json:"concurrency"`
 }
 
@@ -27,6 +28,14 @@ type AIConfig struct {
 	Provider  string `json:"provider"` // "gemini" or "anthropic"
 	Model     string `json:"model"`
 	MaxTokens int    `json:"max_tokens"`
+}
+
+// AlertConfig holds price alert configuration.
+type AlertConfig struct {
+	Enabled    bool      `json:"enabled"`
+	Thresholds []float64 `json:"thresholds"` // e.g. [3.0, 5.0, 10.0] — absolute %, up and down
+	Tickers    []string  `json:"tickers"`    // optional override — empty = all stocks in config
+	StatePath  string    `json:"state_path"` // default: ".alert-state.json"
 }
 
 // TwitterConfig holds Twitter/X fetching configuration.

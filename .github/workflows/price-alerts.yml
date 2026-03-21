@@ -1,0 +1,83 @@
+name: Price Alerts
+
+on:
+  schedule:
+    # Weekdays market hours — full check (stocks + crypto)
+    - cron: '0 8-21 * * 1-5'
+    # Weekday nights — crypto only
+    - cron: '0 0-7,22-23 * * 1-5'
+    # Weekends — crypto only
+    - cron: '0 * * * 0,6'
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.22'
+
+jobs:
+  check-alerts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Set date
+        id: date
+        run: echo "TODAY=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Restore alert state (daily cache)
+        uses: actions/cache/restore@v4
+        with:
+          path: .alert-state.json
+          # restore-keys matches any cache from today so we always get the latest state
+          key: price-alerts-${{ steps.date.outputs.TODAY }}-${{ github.run_number }}
+          restore-keys: price-alerts-${{ steps.date.outputs.TODAY }}-
+
+      - name: Build application
+        run: go build -o stock-checker ./cmd/stock-checker
+
+      - name: Check price alerts
+        run: |
+          # Pass -crypto-only for off-market-hours schedules
+          EXTRA=""
+          if [[ "${{ github.event.schedule }}" != "0 8-21 * * 1-5" ]]; then
+            EXTRA="-crypto-only"
+          fi
+          ./stock-checker -config config.json -check-alerts $EXTRA -alerts-output alerts.html -verbose
+
+      - name: Save alert state (daily cache)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .alert-state.json
+          key: price-alerts-${{ steps.date.outputs.TODAY }}-${{ github.run_number }}
+
+      - name: Send alert email
+        # Only send if alerts.html was written (i.e. new alerts were triggered)
+        if: hashFiles('alerts.html') != ''
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "🚨 Price Alert — ${{ steps.date.outputs.TODAY }}"
+          html_body: file://alerts.html
+          to: ${{ secrets.EMAIL_RECIPIENT }}
+          from: Stock Analyzer <${{ secrets.EMAIL_USERNAME }}>
+          secure: true
+
+      - name: Upload alert artifact
+        if: hashFiles('alerts.html') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: price-alerts-${{ steps.date.outputs.TODAY }}-${{ github.run_number }}
+          path: alerts.html
+          retention-days: 7
