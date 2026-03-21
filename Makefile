@@ -36,13 +36,11 @@ build:
 	@CGO_ENABLED=0 $(GOBUILD) $(LDFLAGS) -o $(BINARY_PATH) $(CMD_PATH)
 	@echo "Build complete: $(BINARY_PATH)"
 
-## run: Build and run the application (output to stdout)
+## run: Generate HTML report and open it
 run: build
-	@./$(BINARY_NAME) -config $(CONFIG_PATH)
-
-## run-verbose: Run with verbose logging
-run-verbose: build
-	@./$(BINARY_NAME) -config $(CONFIG_PATH) -verbose
+	@./$(BINARY_NAME) -config $(CONFIG_PATH) -output report.html -verbose
+	@echo "Report saved to report.html"
+	@open report.html
 
 ## check: Check a single stock (random if TICKER not set)
 check: build
@@ -52,10 +50,22 @@ else
 	@./$(BINARY_NAME) -config $(CONFIG_PATH) -check
 endif
 
-## report: Generate HTML report to file
+## report: Generate HTML report to file (no browser)
 report: build
 	@./$(BINARY_NAME) -config $(CONFIG_PATH) -output report.html -verbose
 	@echo "Report saved to report.html"
+
+## prompt: Fetch stock data + Twitter context, build full AI prompt and write to prompt.txt (copies to clipboard on macOS)
+prompt: build
+	@./$(BINARY_NAME) -config $(CONFIG_PATH) -output /dev/null -prompt-output prompt.txt -verbose
+	@echo "Prompt saved to prompt.txt"
+	@command -v pbcopy >/dev/null 2>&1 && cat prompt.txt | pbcopy && echo "Copied to clipboard" || true
+
+## prompt-twitter: Fetch tweets only and build a standalone trader analysis prompt (copies to clipboard on macOS)
+prompt-twitter: build
+	@./$(BINARY_NAME) -config $(CONFIG_PATH) -twitter-only -prompt-output prompt-twitter.txt -verbose
+	@echo "Twitter prompt saved to prompt-twitter.txt"
+	@command -v pbcopy >/dev/null 2>&1 && cat prompt-twitter.txt | pbcopy && echo "Copied to clipboard" || true
 
 ## report-mock: Generate HTML report using mock data (no API calls)
 report-mock: build
