@@ -6,7 +6,30 @@ import (
 	"time"
 )
 
+// grouped holds one row per ticker with all crossed thresholds merged.
+type grouped struct {
+	Alert
+	thresholds []float64
+}
+
+// groupByTicker merges multiple alerts for the same ticker into one row,
+// collecting all crossed thresholds. Preserves original order (first occurrence).
+func groupByTicker(alerts []Alert) []grouped {
+	seen := make(map[string]int) // ticker -> index in result
+	var result []grouped
+	for _, a := range alerts {
+		if idx, ok := seen[a.Stock.Ticker]; ok {
+			result[idx].thresholds = append(result[idx].thresholds, a.Threshold)
+		} else {
+			seen[a.Stock.Ticker] = len(result)
+			result = append(result, grouped{Alert: a, thresholds: []float64{a.Threshold}})
+		}
+	}
+	return result
+}
+
 // GenerateReport produces a simple HTML email body for the triggered alerts.
+// Stocks that crossed multiple thresholds in the same run appear as a single row.
 func GenerateReport(alerts []Alert) string {
 	var sb strings.Builder
 
@@ -31,18 +54,22 @@ func GenerateReport(alerts []Alert) string {
 
 	sb.WriteString(fmt.Sprintf("<h2>🚨 Price Alerts — %s</h2>\n", time.Now().Format("02 Jan 2006 15:04")))
 	sb.WriteString("<table>\n")
-	sb.WriteString("  <tr><th>Stock</th><th>Ticker</th><th>Open</th><th>Current</th><th>Change</th><th>Threshold</th></tr>\n")
+	sb.WriteString("  <tr><th>Stock</th><th>Ticker</th><th>Open</th><th>Current</th><th>Change</th><th>Thresholds crossed</th></tr>\n")
 
-	for _, a := range alerts {
+	for _, g := range groupByTicker(alerts) {
 		changeClass := "up"
 		changeSign := "+"
-		if a.ChangePercent < 0 {
+		if g.ChangePercent < 0 {
 			changeClass = "down"
 			changeSign = ""
 		}
-		thresholdSign := "+"
-		if a.Threshold < 0 {
-			thresholdSign = ""
+		thresholdParts := make([]string, len(g.thresholds))
+		for i, t := range g.thresholds {
+			sign := "+"
+			if t < 0 {
+				sign = ""
+			}
+			thresholdParts[i] = fmt.Sprintf("%s%.1f%%", sign, t)
 		}
 		sb.WriteString(fmt.Sprintf(
 			`  <tr>
@@ -51,13 +78,13 @@ func GenerateReport(alerts []Alert) string {
     <td>%.2f</td>
     <td>%.2f</td>
     <td class="%s">%s%.2f%%</td>
-    <td>%s%.1f%%</td>
+    <td>%s</td>
   </tr>
 `,
-			a.Stock.Name, a.Stock.Ticker,
-			a.OpenPrice, a.CurrentPrice,
-			changeClass, changeSign, a.ChangePercent,
-			thresholdSign, a.Threshold,
+			g.Stock.Name, g.Stock.Ticker,
+			g.OpenPrice, g.CurrentPrice,
+			changeClass, changeSign, g.ChangePercent,
+			strings.Join(thresholdParts, ", "),
 		))
 	}
 
