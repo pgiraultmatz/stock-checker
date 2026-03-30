@@ -32,7 +32,9 @@
     {"ticker": "PLTR", "name": "Palantir Technologies", "category": "Defense"},
     {"ticker": "EXA.PA", "name": "Exail Technologies SA", "category": "Defense"},
     {"ticker": "CHDVD.SW", "name": "iShares Swiss Dividend", "category": "Others"},
-    {"ticker": "MCHI", "name": "iShares MSCI China", "category": "Others"}
+    {"ticker": "MCHI", "name": "iShares MSCI China", "category": "Others"},
+    {"ticker": "GS", "name": "Goldman Sachs Group, Inc. (The)", "category": "USA"},
+    {"ticker": "ASML", "name": "ASML Holding N.V. - New York Re", "category": "Others"}
   ],
   "categories": [
     {"name": "Metals", "emoji": "1st_place_medal", "order": 1},
