@@ -152,17 +152,15 @@ func runSingleCheck(ctx context.Context, cfg *config.Config, ticker string, logg
 		idx := rand.Intn(len(cfg.Stocks))
 		stock = cfg.Stocks[idx]
 	} else {
-		// Find by ticker
-		found := false
+		// Find by ticker, or create a minimal stock entry if not in config
 		for _, s := range cfg.Stocks {
 			if s.Ticker == ticker {
 				stock = s
-				found = true
 				break
 			}
 		}
-		if !found {
-			return fmt.Errorf("ticker %q not found in config", ticker)
+		if stock.Ticker == "" {
+			stock = models.Stock{Ticker: ticker, Name: ticker, Category: "Unknown"}
 		}
 	}
 
