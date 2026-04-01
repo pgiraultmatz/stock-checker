@@ -38,6 +38,8 @@ jobs:
 
       - name: Run stock analysis
         env:
+          GIST_ID: ${{ secrets.GIST_ID }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           TWITTER_USERNAMES: ${{ secrets.TWITTER_USERNAMES }}
         run: |

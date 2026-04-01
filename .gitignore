@@ -43,6 +43,7 @@ Thumbs.db
 *.log
 
 .claude
+.env
 
 # Generated reports and prompts (root level only)
 /report.html

@@ -23,7 +23,35 @@ import (
 	"stock-checker/internal/yahoo"
 )
 
+// loadDotEnv reads a .env file and sets variables that are not already set in the environment.
+func loadDotEnv(path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return // .env is optional
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if len(value) >= 2 && ((value[0] == '"' && value[len(value)-1] == '"') || (value[0] == '\'' && value[len(value)-1] == '\'')) {
+			value = value[1 : len(value)-1]
+		}
+		if os.Getenv(key) == "" {
+			os.Setenv(key, value)
+		}
+	}
+}
+
 func main() {
+	loadDotEnv(".env")
+
 	// Parse command line flags
 	configPath := flag.String("config", "config.json", "Path to configuration file")
 	promptPath := flag.String("prompt", "manual_prompt.txt", "Path to manual prompt template file")
@@ -49,12 +77,13 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel}))
 	slog.SetDefault(logger)
 
-	// Load configuration
-	cfg, err := config.Load(*configPath)
+	// Load configuration (from Gist if GIST_ID is set, otherwise local file)
+	cfg, err := config.LoadAuto(*configPath)
 	if err != nil {
 		logger.Error("failed to load configuration", "error", err)
 		os.Exit(1)
 	}
+	logger.Info("configuration loaded", "stocks", len(cfg.Stocks), "concurrency", cfg.Concurrency)
 
 	// Create context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
