@@ -42,6 +42,8 @@ Thumbs.db
 *.bak
 *.log
 
+.env
+
 # Generated reports and prompts (root level only)
 /report.html
 /alerts.html

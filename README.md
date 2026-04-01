@@ -54,36 +54,38 @@ A Go-based stock market analysis tool that calculates RSI (Relative Strength Ind
 - Go 1.22+
 - GitHub account (for automated emails)
 - Gmail account with App Password
+- A stock configuration set up via [stock-portfolio](https://github.com/pgiraultmatz/stock-portfolio) (see below)
 
-### Installation
+### 1. Configure your stock portfolio
 
-1. **Clone the repository**
+Stock configuration (tickers, categories, etc.) is managed through a GitHub Gist via the **[stock-portfolio](https://github.com/pgiraultmatz/stock-portfolio)** web editor. Set it up first — it will give you a `GIST_ID` and require a GitHub Personal Access Token (`GH_TOKEN`) with the `gist` scope.
+
+### 2. Clone and install
 
 ```bash
 git clone https://github.com/pgiraultmatz/stock-checker.git
 cd stock-checker
-```
-
-2. **Install dependencies**
-
-```bash
 go mod download
 ```
 
-3. **Set environment variables**
+### 3. Create a `.env` file
 
 ```bash
-export GEMINI_API_KEY=your_gemini_key        # or ANTHROPIC_API_KEY
-export TWITTER_BEARER_TOKEN=your_bearer_token # optional, for Twitter/X context
+# .env
+GIST_ID=your_gist_id
+GH_TOKEN=your_github_pat
+
+GEMINI_API_KEY=your_gemini_key        # or ANTHROPIC_API_KEY
+TWITTER_USERNAMES=trader1,trader2     # optional
 ```
 
-4. **Run locally**
+### 4. Run locally
 
 ```bash
 make run
 ```
 
-This builds the binary and runs the full analysis. To generate an HTML report file:
+To generate an HTML report file:
 
 ```bash
 make report
@@ -94,16 +96,7 @@ open report.html
 
 ### Add/Remove Stocks
 
-Edit `main.go` and modify the `stocks` slice:
-
-```go
-stocks := []Stock{
-    {Ticker: "AAPL", Name: "Apple Inc", Category: "USA"},
-    {Ticker: "TSLA", Name: "Tesla", Category: "USA"},
-    {Ticker: "BTC-USD", Name: "Bitcoin", Category: "Cryptos"},
-    // Add your stocks here
-}
-```
+Stock configuration is managed via the [stock-portfolio](https://github.com/pgiraultmatz/stock-portfolio) web editor. Changes are saved to your GitHub Gist and picked up automatically by stock-checker on the next run — no file editing needed.
 
 ### Supported Categories
 
@@ -171,3 +164,17 @@ make run
 ```
 
 If fetching fails for any reason, the program continues without Twitter context.
+
+## ⚙️ GitHub Actions Setup
+
+The workflows run automatically on a schedule. Add the following secrets in your repository settings (`Settings → Secrets and variables → Actions`):
+
+| Secret | Description |
+|--------|-------------|
+| `GIST_ID` | ID of the GitHub Gist containing your `stock-config.json` (managed via [stock-portfolio](https://github.com/pgiraultmatz/stock-portfolio)) |
+| `GH_TOKEN` | GitHub Personal Access Token with `gist` scope |
+| `GEMINI_API_KEY` | Google Gemini API key (or use `ANTHROPIC_API_KEY`) |
+| `TWITTER_USERNAMES` | Comma-separated Twitter handles (optional) |
+| `EMAIL_USERNAME` | Gmail address used to send reports |
+| `EMAIL_PASSWORD` | Gmail App Password |
+| `EMAIL_RECIPIENT` | Email address to receive reports |

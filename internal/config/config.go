@@ -4,6 +4,8 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 
@@ -145,6 +147,65 @@ func (c *Config) GetCategoryEmoji() map[string]string {
 		emojis[cat.Name] = cat.Emoji
 	}
 	return emojis
+}
+
+// LoadFromGist fetches configuration from a GitHub Gist file named "stock-config.json".
+func LoadFromGist(gistID, token string) (*Config, error) {
+	req, err := http.NewRequest(http.MethodGet, "https://api.github.com/gists/"+gistID, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating gist request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetching gist: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("github API returned %d", resp.StatusCode)
+	}
+
+	var gist struct {
+		Files map[string]struct {
+			Content string `json:"content"`
+		} `json:"files"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&gist); err != nil {
+		return nil, fmt.Errorf("decoding gist response: %w", err)
+	}
+
+	const filename = "stock-config.json"
+	f, ok := gist.Files[filename]
+	if !ok {
+		return nil, fmt.Errorf("file %q not found in gist %s", filename, gistID)
+	}
+
+	cfg := DefaultConfig()
+	if err := json.Unmarshal([]byte(f.Content), cfg); err != nil {
+		return nil, fmt.Errorf("parsing gist config: %w", err)
+	}
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("validating gist config: %w", err)
+	}
+	return cfg, nil
+}
+
+// LoadAuto loads configuration from GitHub Gist when GIST_ID is set,
+// otherwise falls back to the local file at path.
+func LoadAuto(path string) (*Config, error) {
+	gistID := os.Getenv("GIST_ID")
+	if gistID != "" {
+		token := os.Getenv("GH_TOKEN")
+		if token == "" {
+			return nil, fmt.Errorf("GIST_ID is set but GH_TOKEN is missing")
+		}
+		slog.Info("loading config from GitHub Gist", "gist_id", gistID)
+		return LoadFromGist(gistID, token)
+	}
+	return Load(path)
 }
 
 // FindConfigFile searches for a config file in common locations.
