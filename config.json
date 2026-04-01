@@ -34,7 +34,8 @@
     {"ticker": "CHDVD.SW", "name": "iShares Swiss Dividend", "category": "Others"},
     {"ticker": "MCHI", "name": "iShares MSCI China", "category": "Others"},
     {"ticker": "GS", "name": "Goldman Sachs Group, Inc. (The)", "category": "USA"},
-    {"ticker": "ASML", "name": "ASML Holding N.V. - New York Re", "category": "Others"}
+    {"ticker": "ASML", "name": "ASML Holding N.V. - New York Re", "category": "Others"},
+    {"ticker": "META", "name": "Meta Platforms, Inc.", "category": "USA"}
   ],
   "categories": [
     {"name": "Metals", "emoji": "1st_place_medal", "order": 1},
