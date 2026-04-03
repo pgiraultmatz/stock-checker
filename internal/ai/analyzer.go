@@ -127,7 +127,7 @@ Réponds UNIQUEMENT en JSON valide avec cette structure exacte:
   "recommendations": [
     {"ticker": "XXX", "name": "Nom", "action": "buy|sell|hold|watch", "reason": "Raison courte", "risk": "low|medium|high"}
   ],
-  "market_summary": "Résumé en 1-2 phrases de la situation globale du portefeuille"
+  "market_summary": "Résumé en 1-2 phrases de la situation globale du portefeuille. Mentionne également les dates importantes des prochaines semaines pour ce portefeuille (publications de résultats, dividendes, décisions de banques centrales, indicateurs macro) en précisant les tickers concernés."
 }`, stockData+twitterSection)
 
 	response, err := a.client.Complete(ctx, systemPrompt, userPrompt, 2000)
