@@ -15,5 +15,6 @@ Analyse ces données de marché et fournis:
 1. **Top 3 actions intéressantes aujourd'hui**: basé sur les news économiques récentes, elles ne sont pas forcément dans le portefeuille.
 2. **Contexte marché récent**: 2-3 événements des dernières 24-48h qui pourraient impacter ces positions
 3. **Recommandations**: buy/sell/hold/watch pour les positions les plus significatives, avec niveau de risque
+4. **Dates importantes à venir**: publications de résultats, dividendes, décisions de banques centrales, indicateurs macro des prochaines semaines — en précisant les tickers concernés
 
 Données actuelles du portefeuille:
