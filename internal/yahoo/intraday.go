@@ -83,11 +83,18 @@ func (c *Client) GetIntradayPrice(ctx context.Context, ticker string) (*Intraday
 			barTime.Day() != today.Day()
 	}
 
-	changePercent := (currentPrice - openPrice) / openPrice * 100
+	// Use previous close as the reference so that gap-up/gap-down moves are captured.
+	// Fall back to today's open if the previous close is unavailable.
+	referencePrice := result.Meta.ChartPreviousClose
+	if referencePrice == 0 {
+		referencePrice = openPrice
+	}
+
+	changePercent := (currentPrice - referencePrice) / referencePrice * 100
 
 	return &IntradayPrice{
 		Ticker:        ticker,
-		OpenPrice:     openPrice,
+		OpenPrice:     referencePrice,
 		CurrentPrice:  currentPrice,
 		ChangePercent: changePercent,
 		Stale:         stale,

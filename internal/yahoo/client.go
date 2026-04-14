@@ -45,10 +45,11 @@ type ChartResult struct {
 
 // ChartMeta contains metadata about the stock.
 type ChartMeta struct {
-	Symbol             string  `json:"symbol"`
-	Currency           string  `json:"currency"`
-	ExchangeName       string  `json:"exchangeName"`
-	RegularMarketPrice float64 `json:"regularMarketPrice"`
+	Symbol              string  `json:"symbol"`
+	Currency            string  `json:"currency"`
+	ExchangeName        string  `json:"exchangeName"`
+	RegularMarketPrice  float64 `json:"regularMarketPrice"`
+	ChartPreviousClose  float64 `json:"chartPreviousClose"`
 }
 
 // ChartIndicators contains the quote data.
