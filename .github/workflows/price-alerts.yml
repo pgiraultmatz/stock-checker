@@ -49,8 +49,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           # Pass -crypto-only for off-market-hours schedules
+          # workflow_dispatch has no schedule, so treat it as a full check
           EXTRA=""
-          if [[ "${{ github.event.schedule }}" != "0 8-21 * * 1-5" ]]; then
+          SCHED="${{ github.event.schedule }}"
+          if [[ -n "$SCHED" && "$SCHED" != "0 8-21 * * 1-5" ]]; then
             EXTRA="-crypto-only"
           fi
           ./stock-checker -config config.json -check-alerts $EXTRA -alerts-output alerts.html -verbose
