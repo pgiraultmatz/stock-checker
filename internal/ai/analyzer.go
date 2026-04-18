@@ -71,7 +71,7 @@ Tu dois TOUJOURS répondre en JSON valide selon le format demandé.`
 // BuildPrompt returns the formatted prompt to copy-paste into Claude or any other model.
 // It reads the template from promptPath and appends the stock data.
 // If twitterContext is non-empty, it is added as a separate clearly delimited section.
-func BuildPrompt(results []*models.StockResult, promptPath string, twitterContext string) (string, error) {
+func BuildPrompt(results []*models.StockResult, promptPath string, twitterContext string, vixLine string) (string, error) {
 	template, err := os.ReadFile(promptPath)
 	if err != nil {
 		return "", fmt.Errorf("reading prompt template %q: %w", promptPath, err)
@@ -84,6 +84,11 @@ func BuildPrompt(results []*models.StockResult, promptPath string, twitterContex
 	sb.WriteString("SECTION 1 — DONNÉES DE MARCHÉ\n")
 	sb.WriteString("════════════════════════════════════════\n\n")
 	sb.WriteString(string(template))
+	if vixLine != "" {
+		sb.WriteString("\n**Indicateur de volatilité:**\n")
+		sb.WriteString(vixLine)
+		sb.WriteString("\n")
+	}
 	sb.WriteString(stockData)
 
 	if twitterContext != "" {

@@ -140,7 +140,7 @@ func runMockReport(outputPath string, promptPath string, twitterContext string, 
 
 	results := mockStockResults()
 
-	manualPrompt, err := ai.BuildPrompt(results, promptPath, twitterContext)
+	manualPrompt, err := ai.BuildPrompt(results, promptPath, twitterContext, "")
 	if err != nil {
 		logger.Warn("failed to build manual prompt, continuing without it", "error", err)
 	} else {
@@ -155,7 +155,7 @@ func runMockReport(outputPath string, promptPath string, twitterContext string, 
 		return fmt.Errorf("creating report generator: %w", err)
 	}
 
-	htmlReport, err := generator.GenerateWithAI(results, nil, manualPrompt)
+	htmlReport, err := generator.GenerateWithAI(results, nil, manualPrompt, nil)
 	if err != nil {
 		return fmt.Errorf("generating mock report: %w", err)
 	}
@@ -265,13 +265,26 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, p
 		return fmt.Errorf("no stocks were successfully analyzed")
 	}
 
+	// Fetch VIX
+	var vixData *report.VIXData
+	yahooClient := yahoo.NewClient(cfg.YahooAPI)
+	if vix, err := yahooClient.GetIntradayPrice(ctx, "^VIX"); err != nil {
+		logger.Warn("failed to fetch VIX, continuing without it", "error", err)
+	} else {
+		vixData = report.NewVIXData(vix.CurrentPrice, vix.ChangePercent)
+	}
+
 	// Run AI analysis if enabled
 	var aiAnalysis *ai.Analysis
 	var manualPrompt string
 	if cfg.AI.Enabled {
 		if cfg.AI.Mode == "manual_prompt" {
 			var err error
-			manualPrompt, err = ai.BuildPrompt(results, promptPath, twitterContext)
+			var vixLine string
+			if vixData != nil {
+				vixLine = fmt.Sprintf("- VIX: %s (%s) — %s\n", vixData.Price, vixData.Change, vixData.Level)
+			}
+			manualPrompt, err = ai.BuildPrompt(results, promptPath, twitterContext, vixLine)
 			if err != nil {
 				logger.Warn("failed to build manual prompt, continuing without it", "error", err)
 			} else {
@@ -315,7 +328,7 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, p
 		return fmt.Errorf("creating report generator: %w", err)
 	}
 
-	htmlReport, err := generator.GenerateWithAI(results, aiAnalysis, manualPrompt)
+	htmlReport, err := generator.GenerateWithAI(results, aiAnalysis, manualPrompt, vixData)
 	if err != nil {
 		return fmt.Errorf("generating report: %w", err)
 	}

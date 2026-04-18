@@ -65,6 +65,52 @@
             font-weight: 500;
         }
 
+        /* VIX Banner */
+        .vix-banner {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 14px 24px;
+            border-bottom: 1px solid #d0d7de;
+            background-color: #f6f8fa;
+            font-size: 14px;
+        }
+
+        .vix-label {
+            font-weight: 700;
+            font-size: 13px;
+            color: #57606a;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .vix-price {
+            font-size: 22px;
+            font-weight: 700;
+            color: #24292f;
+        }
+
+        .vix-change {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .vix-change.positive { color: #1a7f37; }
+        .vix-change.negative { color: #cf222e; }
+        .vix-change.neutral  { color: #57606a; }
+
+        .vix-level {
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: auto;
+        }
+
+        .vix-low      { background: #dafbe1; color: #116329; }
+        .vix-moderate { background: #fff8c5; color: #7d4e00; }
+        .vix-extreme  { background: #ffebe9; color: #82071e; }
+
         /* Category Section */
         .category {
             border-top: 1px solid #d0d7de;
@@ -591,6 +637,15 @@
                 {{end}}
             </div>
         </div>
+
+        {{if .VIX}}
+        <div class="vix-banner">
+            <span class="vix-label">VIX</span>
+            <span class="vix-price">{{.VIX.Price}}</span>
+            <span class="vix-change {{.VIX.ChangeClass}}">{{.VIX.Change}}</span>
+            <span class="vix-level {{.VIX.LevelClass}}">{{.VIX.Level}} volatility</span>
+        </div>
+        {{end}}
 
         {{range .CategoryGroups}}
         <div class="category">
