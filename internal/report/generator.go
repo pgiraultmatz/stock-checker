@@ -24,6 +24,16 @@ type Generator struct {
 	categoryOrder  map[string]int
 }
 
+// VIXData holds the VIX index data for display at the top of the report.
+type VIXData struct {
+	Price         string
+	ChangePercent float64
+	Change        string
+	ChangeClass   string
+	Level         string // "low", "moderate", "high", "extreme"
+	LevelClass    string
+}
+
 // TemplateData contains the data passed to the HTML template.
 type TemplateData struct {
 	Title           string
@@ -34,6 +44,7 @@ type TemplateData struct {
 	OverboughtCount int
 	AIAnalysis      *AIAnalysisData
 	ManualPrompt    string
+	VIX             *VIXData
 }
 
 // CategoryGroupData represents a category with its stocks for the template.
@@ -138,13 +149,42 @@ func NewGenerator(categoryEmojis map[string]string, categoryOrder map[string]int
 	}, nil
 }
 
+// NewVIXData builds a VIXData from raw price and change values.
+func NewVIXData(price, changePercent float64) *VIXData {
+	changeClass := "neutral"
+	if changePercent > 0.01 {
+		changeClass = "negative" // rising VIX = bad
+	} else if changePercent < -0.01 {
+		changeClass = "positive" // falling VIX = good
+	}
+
+	level, levelClass := "Normal", "vix-moderate"
+	switch {
+	case price >= 30:
+		level, levelClass = "Stress", "vix-extreme"
+	case price >= 15:
+		level, levelClass = "Normal", "vix-moderate"
+	default:
+		level, levelClass = "Calm", "vix-low"
+	}
+
+	return &VIXData{
+		Price:         fmt.Sprintf("%.2f", price),
+		ChangePercent: changePercent,
+		Change:        fmt.Sprintf("%+.2f%%", changePercent),
+		ChangeClass:   changeClass,
+		Level:         level,
+		LevelClass:    levelClass,
+	}
+}
+
 // Generate creates an HTML report from the analysis results.
 func (g *Generator) Generate(results []*models.StockResult) (string, error) {
-	return g.GenerateWithAI(results, nil, "")
+	return g.GenerateWithAI(results, nil, "", nil)
 }
 
 // GenerateWithAI creates an HTML report with optional AI analysis or manual prompt.
-func (g *Generator) GenerateWithAI(results []*models.StockResult, aiAnalysis *ai.Analysis, manualPrompt string) (string, error) {
+func (g *Generator) GenerateWithAI(results []*models.StockResult, aiAnalysis *ai.Analysis, manualPrompt string, vix *VIXData) (string, error) {
 	data := g.prepareTemplateData(results)
 
 	// Add AI analysis if provided
@@ -156,6 +196,8 @@ func (g *Generator) GenerateWithAI(results []*models.StockResult, aiAnalysis *ai
 	if manualPrompt != "" {
 		data.ManualPrompt = manualPrompt
 	}
+
+	data.VIX = vix
 
 	var buf bytes.Buffer
 	if err := g.templates.ExecuteTemplate(&buf, "report.html", data); err != nil {
