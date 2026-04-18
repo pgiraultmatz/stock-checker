@@ -45,11 +45,12 @@ type ChartResult struct {
 
 // ChartMeta contains metadata about the stock.
 type ChartMeta struct {
-	Symbol              string  `json:"symbol"`
-	Currency            string  `json:"currency"`
-	ExchangeName        string  `json:"exchangeName"`
-	RegularMarketPrice  float64 `json:"regularMarketPrice"`
-	ChartPreviousClose  float64 `json:"chartPreviousClose"`
+	Symbol                      string  `json:"symbol"`
+	Currency                    string  `json:"currency"`
+	ExchangeName                string  `json:"exchangeName"`
+	RegularMarketPrice          float64 `json:"regularMarketPrice"`
+	RegularMarketPreviousClose  float64 `json:"regularMarketPreviousClose"`
+	ChartPreviousClose          float64 `json:"chartPreviousClose"`
 }
 
 // ChartIndicators contains the quote data.
@@ -74,11 +75,62 @@ type ChartError struct {
 
 // StockData contains the processed data for a stock.
 type StockData struct {
-	Symbol     string
-	Currency   string
-	Exchange   string
-	Closes     []float64
-	Timestamps []time.Time
+	Symbol        string
+	Currency      string
+	Exchange      string
+	Closes        []float64
+	Timestamps    []time.Time
+	CurrentPrice  float64
+	PreviousClose float64
+}
+
+// GetPreviousDayClose fetches the previous trading day's close price.
+func (c *Client) GetPreviousDayClose(ctx context.Context, ticker string) (float64, error) {
+	url := fmt.Sprintf("%s/%s?range=5d&interval=1d", c.config.BaseURL, ticker)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return 0, fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("User-Agent", c.config.UserAgent)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("executing request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return 0, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, fmt.Errorf("reading response: %w", err)
+	}
+
+	var chartResp ChartResponse
+	if err := json.Unmarshal(body, &chartResp); err != nil {
+		return 0, fmt.Errorf("parsing response: %w", err)
+	}
+
+	if chartResp.Chart.Error != nil {
+		return 0, fmt.Errorf("API error: %s - %s", chartResp.Chart.Error.Code, chartResp.Chart.Error.Description)
+	}
+
+	if len(chartResp.Chart.Result) == 0 {
+		return 0, fmt.Errorf("no data returned for %s", ticker)
+	}
+
+	closes := chartResp.Chart.Result[0].Indicators.Quote[0].Close
+	if len(closes) < 2 {
+		return 0, fmt.Errorf("insufficient daily data for %s", ticker)
+	}
+
+	// Second-to-last is previous trading day's close
+	return closes[len(closes)-2], nil
 }
 
 // GetChartData fetches chart data for a ticker symbol.
@@ -143,10 +195,12 @@ func (c *Client) GetChartData(ctx context.Context, ticker string) (*StockData, e
 	}
 
 	return &StockData{
-		Symbol:     result.Meta.Symbol,
-		Currency:   result.Meta.Currency,
-		Exchange:   result.Meta.ExchangeName,
-		Closes:     closes,
-		Timestamps: timestamps,
+		Symbol:        result.Meta.Symbol,
+		Currency:      result.Meta.Currency,
+		Exchange:      result.Meta.ExchangeName,
+		Closes:        closes,
+		Timestamps:    timestamps,
+		CurrentPrice:  result.Meta.RegularMarketPrice,
+		PreviousClose: result.Meta.RegularMarketPreviousClose,
 	}, nil
 }

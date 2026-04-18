@@ -56,7 +56,15 @@ func (a *Analyzer) AnalyzeStock(ctx context.Context, stock models.Stock) *models
 		return result
 	}
 
-	result.CurrentPrice, result.ChangePercent = analysis.CalculatePriceChange(data.Closes)
+	result.CurrentPrice = data.CurrentPrice
+
+	prevClose, err := a.client.GetPreviousDayClose(ctx, stock.Ticker)
+	if err != nil {
+		a.logger.Warn("failed to fetch previous day close", "ticker", stock.Ticker, "error", err)
+	} else if prevClose > 0 {
+		result.ChangePercent = ((data.CurrentPrice - prevClose) / prevClose) * 100
+	}
+
 	result.RSI = a.rsiCalculator.Calculate(data.Closes)
 
 	return result
