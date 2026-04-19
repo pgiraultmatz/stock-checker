@@ -71,7 +71,15 @@ Tu dois TOUJOURS répondre en JSON valide selon le format demandé.`
 // BuildPrompt returns the formatted prompt to copy-paste into Claude or any other model.
 // It reads the template from promptPath and appends the stock data.
 // If twitterContext is non-empty, it is added as a separate clearly delimited section.
-func BuildPrompt(results []*models.StockResult, promptPath string, twitterContext string, vixLine string) (string, error) {
+// PromptContext holds optional context sections to include in the prompt.
+type PromptContext struct {
+	VIXLine        string
+	TwitterContext string
+	AIPortfolios   string
+	InsiderAlerts  string
+}
+
+func BuildPrompt(results []*models.StockResult, promptPath string, ctx PromptContext) (string, error) {
 	template, err := os.ReadFile(promptPath)
 	if err != nil {
 		return "", fmt.Errorf("reading prompt template %q: %w", promptPath, err)
@@ -84,18 +92,32 @@ func BuildPrompt(results []*models.StockResult, promptPath string, twitterContex
 	sb.WriteString("SECTION 1 — DONNÉES DE MARCHÉ\n")
 	sb.WriteString("════════════════════════════════════════\n\n")
 	sb.WriteString(string(template))
-	if vixLine != "" {
+	if ctx.VIXLine != "" {
 		sb.WriteString("\n**Indicateur de volatilité:**\n")
-		sb.WriteString(vixLine)
+		sb.WriteString(ctx.VIXLine)
 		sb.WriteString("\n")
 	}
 	sb.WriteString(stockData)
 
-	if twitterContext != "" {
+	if ctx.TwitterContext != "" {
 		sb.WriteString("\n\n════════════════════════════════════════\n")
-		sb.WriteString("SECTION 2 — SENTIMENT DES TRADERS\n")
+		sb.WriteString("SECTION 2 — SENTIMENT DES TRADERS CRYPTOS\n")
 		sb.WriteString("════════════════════════════════════════\n\n")
-		sb.WriteString(twitterContext)
+		sb.WriteString(ctx.TwitterContext)
+	}
+
+	if ctx.AIPortfolios != "" {
+		sb.WriteString("\n\n════════════════════════════════════════\n")
+		sb.WriteString("SECTION 3 — AI PORTFOLIOS\n")
+		sb.WriteString("════════════════════════════════════════\n\n")
+		sb.WriteString(ctx.AIPortfolios)
+	}
+
+	if ctx.InsiderAlerts != "" {
+		sb.WriteString("\n\n════════════════════════════════════════\n")
+		sb.WriteString("SECTION 4 — INSIDER ALERTS\n")
+		sb.WriteString("════════════════════════════════════════\n\n")
+		sb.WriteString(ctx.InsiderAlerts)
 	}
 
 	return sb.String(), nil
