@@ -44,10 +44,12 @@ type AlertConfig struct {
 // The list of usernames to follow is read from the TWITTER_USERNAMES environment
 // variable (comma-separated) to avoid committing them to the repository.
 type TwitterConfig struct {
-	Enabled        bool   `json:"enabled"`
-	MaxTweets      int    `json:"max_tweets"`
-	Provider        string   `json:"provider"`         // "nitter" (default) or "api"
-	NitterInstances []string `json:"nitter_instances"` // tried in order until one works
+	Enabled         bool     `json:"enabled"`
+	MaxTweets       int      `json:"max_tweets"`
+	Provider        string   `json:"provider"`          // "nitter" (default) or "api"
+	NitterInstances []string `json:"nitter_instances"`  // tried in order until one works
+	AIPortfolios    []string `json:"ai_portfolios"`     // accounts for AI Portfolios section
+	InsiderAlerts   []string `json:"insider_alerts"`    // accounts for Insider Alerts section
 }
 
 // YahooAPIConfig holds Yahoo Finance API configuration.
