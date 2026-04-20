@@ -49,8 +49,8 @@ func FormatTweets(username string, tweets []Tweet) string {
 		return ""
 	}
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("## Analyses crypto récentes de @%s (Twitter/X)\n", username))
-	sb.WriteString("Ces tweets proviennent d'un trader quantitatif spécialisé dans le marché crypto.\n\n")
+	sb.WriteString(fmt.Sprintf("## Tweets récents de l'utilisateur @%s\n", username))
+	sb.WriteString("\n")
 	for i, t := range tweets {
 		date := t.CreatedAt.Format("02 Jan 2006 15:04")
 		sb.WriteString(fmt.Sprintf("%d. [%s]\n%s\n\n", i+1, date, t.Text))
