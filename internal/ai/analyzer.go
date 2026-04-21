@@ -68,17 +68,33 @@ Règles importantes:
 
 Tu dois TOUJOURS répondre en JSON valide selon le format demandé.`
 
-// BuildPrompt returns the formatted prompt to copy-paste into Claude or any other model.
-// It reads the template from promptPath and appends the stock data.
-// If twitterContext is non-empty, it is added as a separate clearly delimited section.
-// PromptContext holds optional context sections to include in the prompt.
-type PromptContext struct {
-	VIXLine        string
-	TwitterContext string
-	AIPortfolios   string
-	InsiderAlerts  string
+// XGroupSection holds the fetched content for one named Twitter/X group.
+type XGroupSection struct {
+	Name    string
+	Content string
 }
 
+// PromptContext holds optional context sections to include in the prompt.
+type PromptContext struct {
+	VIXLine string
+	XGroups []XGroupSection
+}
+
+// FormatXGroups concatenates all group contents into a single string for API mode.
+func FormatXGroups(groups []XGroupSection) string {
+	var sb strings.Builder
+	for _, g := range groups {
+		if g.Content == "" {
+			continue
+		}
+		sb.WriteString(fmt.Sprintf("## %s\n\n", g.Name))
+		sb.WriteString(g.Content)
+		sb.WriteString("\n")
+	}
+	return sb.String()
+}
+
+// BuildPrompt returns the formatted prompt to copy-paste into Claude or any other model.
 func BuildPrompt(results []*models.StockResult, promptPath string, ctx PromptContext) (string, error) {
 	template, err := os.ReadFile(promptPath)
 	if err != nil {
@@ -99,25 +115,14 @@ func BuildPrompt(results []*models.StockResult, promptPath string, ctx PromptCon
 	}
 	sb.WriteString(stockData)
 
-	if ctx.TwitterContext != "" {
-		sb.WriteString("\n\n════════════════════════════════════════\n")
-		sb.WriteString("SECTION 2 — SENTIMENT DES TRADERS CRYPTOS\n")
+	for i, group := range ctx.XGroups {
+		if group.Content == "" {
+			continue
+		}
+		sb.WriteString(fmt.Sprintf("\n\n════════════════════════════════════════\n"))
+		sb.WriteString(fmt.Sprintf("SECTION %d — %s\n", i+2, strings.ToUpper(group.Name)))
 		sb.WriteString("════════════════════════════════════════\n\n")
-		sb.WriteString(ctx.TwitterContext)
-	}
-
-	if ctx.AIPortfolios != "" {
-		sb.WriteString("\n\n════════════════════════════════════════\n")
-		sb.WriteString("SECTION 3 — AI PORTFOLIOS\n")
-		sb.WriteString("════════════════════════════════════════\n\n")
-		sb.WriteString(ctx.AIPortfolios)
-	}
-
-	if ctx.InsiderAlerts != "" {
-		sb.WriteString("\n\n════════════════════════════════════════\n")
-		sb.WriteString("SECTION 4 — INSIDER ALERTS\n")
-		sb.WriteString("════════════════════════════════════════\n\n")
-		sb.WriteString(ctx.InsiderAlerts)
+		sb.WriteString(group.Content)
 	}
 
 	return sb.String(), nil

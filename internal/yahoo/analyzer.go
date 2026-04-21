@@ -57,6 +57,7 @@ func (a *Analyzer) AnalyzeStock(ctx context.Context, stock models.Stock) *models
 	}
 
 	result.CurrentPrice = data.CurrentPrice
+	result.Currency = data.Currency
 
 	prevClose, err := a.client.GetPreviousDayClose(ctx, stock.Ticker)
 	if err != nil {

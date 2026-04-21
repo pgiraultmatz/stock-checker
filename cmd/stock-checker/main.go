@@ -108,11 +108,11 @@ func main() {
 	}
 
 	// Fetch tweets if configured
-	twitterContext := fetchTwitterContext(ctx, cfg, logger)
+	xGroups := fetchAllXGroups(ctx, cfg, logger)
 
 	// Mock report mode: skip Yahoo Finance API, generate manual prompt from mock data
 	if *mock {
-		if err := runMockReport(*outputPath, *promptPath, twitterContext, logger); err != nil {
+		if err := runMockReport(*outputPath, *promptPath, logger); err != nil {
 			logger.Error("mock report failed", "error", err)
 			os.Exit(1)
 		}
@@ -129,13 +129,13 @@ func main() {
 	}
 
 	// Full report mode
-	if err := runFullReport(ctx, cfg, *outputPath, *promptOutput, *promptPath, twitterContext, logger); err != nil {
+	if err := runFullReport(ctx, cfg, *outputPath, *promptOutput, *promptPath, xGroups, logger); err != nil {
 		logger.Error("analysis failed", "error", err)
 		os.Exit(1)
 	}
 }
 
-func runMockReport(outputPath string, promptPath string, twitterContext string, logger *slog.Logger) error {
+func runMockReport(outputPath string, promptPath string, logger *slog.Logger) error {
 	logger.Info("generating mock report with manual prompt (no API calls)")
 
 	results := mockStockResults()
@@ -242,7 +242,7 @@ func printStockResult(r *models.StockResult) {
 	fmt.Println()
 }
 
-func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, promptOutput string, promptPath string, twitterContext string, logger *slog.Logger) error {
+func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, promptOutput string, promptPath string, xGroups []ai.XGroupSection, logger *slog.Logger) error {
 	logger.Info("starting stock analysis",
 		"stocks", len(cfg.Stocks),
 		"concurrency", cfg.Concurrency,
@@ -280,11 +280,7 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, p
 	if cfg.AI.Enabled {
 		if cfg.AI.Mode == "manual_prompt" {
 			var err error
-			promptCtx := ai.PromptContext{
-				TwitterContext: twitterContext,
-				AIPortfolios:   fetchTwitterGroup(ctx, cfg, cfg.Twitter.AIPortfolios, logger),
-				InsiderAlerts:  fetchTwitterGroup(ctx, cfg, cfg.Twitter.InsiderAlerts, logger),
-			}
+			promptCtx := ai.PromptContext{XGroups: xGroups}
 			if vixData != nil {
 				promptCtx.VIXLine = fmt.Sprintf("- VIX: %s (%s) — %s\n", vixData.Price, vixData.Change, vixData.Level)
 			}
@@ -314,7 +310,7 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, p
 				aiAnalyzer := ai.NewAnalyzer(aiClient)
 
 				var err error
-				aiAnalysis, err = aiAnalyzer.Analyze(ctx, results, twitterContext)
+				aiAnalysis, err = aiAnalyzer.Analyze(ctx, results, ai.FormatXGroups(xGroups))
 				if err != nil {
 					logger.Warn("AI analysis failed, continuing without it", "error", err)
 				} else {
@@ -459,20 +455,25 @@ func runAlerts(ctx context.Context, cfg *config.Config, outputPath string, crypt
 	return nil
 }
 
-// runTwitterPrompt fetches tweets from all users in TWITTER_USERNAMES and writes
-// a standalone analysis prompt to promptOutput (or stdout if empty).
+// runTwitterPrompt fetches tweets from all xGroups and writes a standalone prompt to promptOutput (or stdout).
 func runTwitterPrompt(ctx context.Context, cfg *config.Config, templatePath string, promptOutput string, logger *slog.Logger) error {
-	twitterContext := fetchTwitterContext(ctx, cfg, logger)
-	if twitterContext == "" {
-		return fmt.Errorf("no tweets fetched — check TWITTER_USERNAMES and twitter config")
+	groups := fetchAllXGroups(ctx, cfg, logger)
+	if len(groups) == 0 {
+		return fmt.Errorf("no tweets fetched — check xGroups in twitter config")
 	}
 
-	template, err := os.ReadFile(templatePath)
+	tmpl, err := os.ReadFile(templatePath)
 	if err != nil {
 		return fmt.Errorf("reading twitter prompt template %q: %w", templatePath, err)
 	}
 
-	prompt := string(template) + twitterContext
+	var sb strings.Builder
+	sb.Write(tmpl)
+	for _, g := range groups {
+		sb.WriteString(fmt.Sprintf("\n\n## %s\n\n", g.Name))
+		sb.WriteString(g.Content)
+	}
+	prompt := sb.String()
 
 	if promptOutput != "" {
 		if err := os.WriteFile(promptOutput, []byte(prompt), 0644); err != nil {
@@ -485,21 +486,17 @@ func runTwitterPrompt(ctx context.Context, cfg *config.Config, templatePath stri
 	return nil
 }
 
-// fetchTwitterContext fetches recent tweets from all users listed in the
-// TWITTER_USERNAMES environment variable (comma-separated) and returns them
-// formatted as a single string for inclusion in the AI prompt.
-// Returns an empty string if Twitter is disabled or no usernames are set.
-func fetchTwitterContext(ctx context.Context, cfg *config.Config, logger *slog.Logger) string {
+// fetchAllXGroups fetches tweets for every xGroup defined in the Twitter config.
+func fetchAllXGroups(ctx context.Context, cfg *config.Config, logger *slog.Logger) []ai.XGroupSection {
 	if !cfg.Twitter.Enabled {
-		return ""
+		logger.Info("twitter disabled, skipping")
+		return nil
 	}
-
-	usernamesEnv := os.Getenv("TWITTER_USERNAMES")
-	if usernamesEnv == "" {
-		logger.Warn("twitter enabled but TWITTER_USERNAMES not set, skipping")
-		return ""
+	if len(cfg.XGroups) == 0 {
+		logger.Warn("twitter enabled but no xGroups configured")
+		return nil
 	}
-	usernames := strings.Split(usernamesEnv, ",")
+	logger.Info("fetching tweets", "groups", len(cfg.XGroups))
 
 	maxTweets := cfg.Twitter.MaxTweets
 	if maxTweets <= 0 {
@@ -509,64 +506,45 @@ func fetchTwitterContext(ctx context.Context, cfg *config.Config, logger *slog.L
 	fetcher, err := twitter.NewFetcher(cfg.Twitter.Provider, os.Getenv("TWITTER_BEARER_TOKEN"), cfg.Twitter.NitterInstances)
 	if err != nil {
 		logger.Warn("twitter fetcher init failed, skipping", "error", err)
-		return ""
+		return nil
 	}
 
-	var sections []string
-	for _, username := range usernames {
-		username = strings.TrimSpace(username)
-		if username == "" {
-			continue
-		}
-		tweets, err := fetcher.GetRecentTweets(ctx, username, maxTweets)
-		if err != nil {
-			logger.Warn("failed to fetch tweets", "user", username, "error", err)
-			continue
-		}
-		logger.Info("tweets fetched", "provider", cfg.Twitter.Provider, "user", username, "count", len(tweets))
-		if section := twitter.FormatTweets(username, tweets); section != "" {
-			sections = append(sections, section)
-		}
+	delay := time.Duration(cfg.Twitter.RequestDelaySeconds) * time.Second
+	if delay <= 0 {
+		delay = 1 * time.Second
 	}
 
-	return strings.Join(sections, "\n")
-}
+	var result []ai.XGroupSection
+	first := true
+	for _, group := range cfg.XGroups {
+		var groupBuf strings.Builder
+		for _, account := range group.Accounts {
+			account = strings.TrimSpace(account)
+			if account == "" {
+				continue
+			}
+			if !first {
+				time.Sleep(delay)
+			}
+			first = false
 
-// fetchTwitterGroup fetches tweets for a specific list of usernames and returns a formatted string.
-func fetchTwitterGroup(ctx context.Context, cfg *config.Config, usernames []string, logger *slog.Logger) string {
-	if !cfg.Twitter.Enabled || len(usernames) == 0 {
-		return ""
-	}
-
-	maxTweets := cfg.Twitter.MaxTweets
-	if maxTweets <= 0 {
-		maxTweets = 4
-	}
-
-	fetcher, err := twitter.NewFetcher(cfg.Twitter.Provider, os.Getenv("TWITTER_BEARER_TOKEN"), cfg.Twitter.NitterInstances)
-	if err != nil {
-		logger.Warn("twitter fetcher init failed", "error", err)
-		return ""
-	}
-
-	var sections []string
-	for _, username := range usernames {
-		username = strings.TrimSpace(username)
-		if username == "" {
-			continue
+			tweets, err := fetcher.GetRecentTweets(ctx, account, maxTweets)
+			if err != nil {
+				logger.Warn("failed to fetch tweets", "user", account, "error", err)
+				continue
+			}
+			logger.Info("tweets fetched", "group", group.Name, "user", account, "total", len(tweets))
+			tweets = twitter.FilterRecent(tweets)
+			logger.Info("tweets after filter", "group", group.Name, "user", account, "recent", len(tweets))
+			if section := twitter.FormatTweets(account, tweets); section != "" {
+				groupBuf.WriteString(section)
+			}
 		}
-		tweets, err := fetcher.GetRecentTweets(ctx, username, maxTweets)
-		if err != nil {
-			logger.Warn("failed to fetch tweets", "user", username, "error", err)
-			continue
-		}
-		logger.Info("tweets fetched", "user", username, "count", len(tweets))
-		if section := twitter.FormatTweets(username, tweets); section != "" {
-			sections = append(sections, section)
+		if groupBuf.Len() > 0 {
+			result = append(result, ai.XGroupSection{Name: group.Name, Content: groupBuf.String()})
 		}
 	}
-
-	return strings.Join(sections, "\n")
+	return result
 }
 
 // getAICredentials returns the API key and provider based on config and environment.

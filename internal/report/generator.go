@@ -58,6 +58,7 @@ type CategoryGroupData struct {
 type StockRowData struct {
 	Name          string
 	Price         string
+	Currency      string
 	Change        string
 	ChangePercent float64
 	ChangeClass   string
@@ -291,6 +292,7 @@ func (g *Generator) createStockRow(result *models.StockResult) StockRowData {
 	return StockRowData{
 		Name:          result.Stock.Name,
 		Price:         fmt.Sprintf("%.2f", result.CurrentPrice),
+		Currency:      result.Currency,
 		Change:        fmt.Sprintf("%+.2f%%", result.ChangePercent),
 		ChangePercent: result.ChangePercent,
 		ChangeClass:   changeClass,

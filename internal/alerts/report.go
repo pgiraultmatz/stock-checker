@@ -3,7 +3,6 @@ package alerts
 import (
 	"fmt"
 	"strings"
-	"time"
 )
 
 // grouped holds one row per ticker with all crossed thresholds merged.
@@ -52,9 +51,9 @@ func GenerateReport(alerts []Alert) string {
 <body>
 `)
 
-	sb.WriteString(fmt.Sprintf("<h2>🚨 Price Alerts — %s</h2>\n", time.Now().Format("02 Jan 2006 15:04")))
+	sb.WriteString("<h2>🚨 Price Alerts</h2>\n")
 	sb.WriteString("<table>\n")
-	sb.WriteString("  <tr><th>Stock</th><th>Ticker</th><th>Open</th><th>Current</th><th>Change</th><th>Thresholds crossed</th></tr>\n")
+	sb.WriteString("  <tr><th>Stock</th><th>Ticker</th><th>Open</th><th>Current</th><th>Change</th></tr>\n")
 
 	for _, g := range groupByTicker(alerts) {
 		changeClass := "up"
@@ -63,14 +62,6 @@ func GenerateReport(alerts []Alert) string {
 			changeClass = "down"
 			changeSign = ""
 		}
-		thresholdParts := make([]string, len(g.thresholds))
-		for i, t := range g.thresholds {
-			sign := "+"
-			if t < 0 {
-				sign = ""
-			}
-			thresholdParts[i] = fmt.Sprintf("%s%.1f%%", sign, t)
-		}
 		sb.WriteString(fmt.Sprintf(
 			`  <tr>
     <td>%s</td>
@@ -78,13 +69,11 @@ func GenerateReport(alerts []Alert) string {
     <td>%.2f</td>
     <td>%.2f</td>
     <td class="%s">%s%.2f%%</td>
-    <td>%s</td>
   </tr>
 `,
 			g.Stock.Name, g.Stock.Ticker,
 			g.OpenPrice, g.CurrentPrice,
 			changeClass, changeSign, g.ChangePercent,
-			strings.Join(thresholdParts, ", "),
 		))
 	}
 
