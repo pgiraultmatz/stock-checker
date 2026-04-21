@@ -14,6 +14,7 @@ type StockResult struct {
 	CurrentPrice  float64
 	ChangePercent float64
 	RSI           float64
+	Currency      string
 	Error         error // Non-nil if analysis failed
 }
 

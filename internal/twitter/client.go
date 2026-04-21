@@ -43,6 +43,22 @@ func NewFetcher(provider, bearerToken string, nitterInstances []string) (Fetcher
 	}
 }
 
+// FilterRecent keeps only tweets from today or yesterday (in local time).
+func FilterRecent(tweets []Tweet) []Tweet {
+	now := time.Now()
+	today := now.Truncate(24 * time.Hour)
+	yesterday := today.Add(-24 * time.Hour)
+
+	filtered := tweets[:0]
+	for _, t := range tweets {
+		day := t.CreatedAt.UTC().Truncate(24 * time.Hour)
+		if !day.Before(yesterday) {
+			filtered = append(filtered, t)
+		}
+	}
+	return filtered
+}
+
 // FormatTweets formats a list of tweets into a prompt section for the AI.
 func FormatTweets(username string, tweets []Tweet) string {
 	if len(tweets) == 0 {

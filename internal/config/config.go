@@ -19,6 +19,7 @@ type Config struct {
 	YahooAPI    YahooAPIConfig    `json:"yahoo_api"`
 	AI          AIConfig          `json:"ai"`
 	Twitter     TwitterConfig     `json:"twitter"`
+	XGroups     []XGroup          `json:"xGroups"`
 	Alerts      AlertConfig       `json:"alerts"`
 	Concurrency int               `json:"concurrency"`
 }
@@ -40,16 +41,19 @@ type AlertConfig struct {
 	StatePath  string    `json:"state_path"` // default: ".alert-state.json"
 }
 
+// XGroup represents a named group of Twitter/X accounts.
+type XGroup struct {
+	Name     string   `json:"name"`
+	Accounts []string `json:"accounts"`
+}
+
 // TwitterConfig holds Twitter/X fetching configuration.
-// The list of usernames to follow is read from the TWITTER_USERNAMES environment
-// variable (comma-separated) to avoid committing them to the repository.
 type TwitterConfig struct {
-	Enabled         bool     `json:"enabled"`
-	MaxTweets       int      `json:"max_tweets"`
-	Provider        string   `json:"provider"`          // "nitter" (default) or "api"
-	NitterInstances []string `json:"nitter_instances"`  // tried in order until one works
-	AIPortfolios    []string `json:"ai_portfolios"`     // accounts for AI Portfolios section
-	InsiderAlerts   []string `json:"insider_alerts"`    // accounts for Insider Alerts section
+	Enabled             bool     `json:"enabled"`
+	MaxTweets           int      `json:"max_tweets"`
+	Provider            string   `json:"provider"`              // "nitter" (default) or "api"
+	NitterInstances     []string `json:"nitter_instances"`      // tried in order until one works
+	RequestDelaySeconds int      `json:"request_delay_seconds"` // delay between user fetches to avoid rate limiting (default: 1)
 }
 
 // YahooAPIConfig holds Yahoo Finance API configuration.
