@@ -4,6 +4,7 @@ package yahoo
 import (
 	"context"
 	"log/slog"
+	"math"
 	"sync"
 
 	"stock-checker/internal/analysis"
@@ -59,11 +60,15 @@ func (a *Analyzer) AnalyzeStock(ctx context.Context, stock models.Stock) *models
 	result.CurrentPrice = data.CurrentPrice
 	result.Currency = data.Currency
 
-	prevClose, err := a.client.GetPreviousDayClose(ctx, stock.Ticker)
+	j1, j2, err := a.client.GetPreviousDayClose(ctx, stock.Ticker)
 	if err != nil {
-		a.logger.Warn("failed to fetch previous day close", "ticker", stock.Ticker, "error", err)
-	} else if prevClose > 0 {
-		result.ChangePercent = ((data.CurrentPrice - prevClose) / prevClose) * 100
+		a.logger.Warn("failed to fetch daily closes", "ticker", stock.Ticker, "error", err)
+	} else if j1 > 0 {
+		change := ((data.CurrentPrice - j1) / j1) * 100
+		if math.Abs(change) < 0.05 && j2 > 0 {
+			change = ((j1 - j2) / j2) * 100
+		}
+		result.ChangePercent = change
 	}
 
 	result.RSI = a.rsiCalculator.Calculate(data.Closes)

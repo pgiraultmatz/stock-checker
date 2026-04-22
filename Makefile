@@ -1,4 +1,4 @@
-.PHONY: build run test clean lint fmt help report report-mock
+.PHONY: build run run-no-twitter test clean lint fmt help report report-mock
 
 # Go parameters
 GOCMD=go
@@ -39,6 +39,12 @@ build:
 ## run: Generate HTML report and open it
 run: build
 	@./$(BINARY_NAME) -config $(CONFIG_PATH) -output report.html -verbose
+	@echo "Report saved to report.html"
+	@open report.html
+
+## run-no-twitter: Generate HTML report without fetching tweets
+run-no-twitter: build
+	@./$(BINARY_NAME) -config $(CONFIG_PATH) -output report.html -no-twitter -verbose
 	@echo "Report saved to report.html"
 	@open report.html
 

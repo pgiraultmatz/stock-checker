@@ -259,7 +259,7 @@ func (g *Generator) prepareTemplateData(results []*models.StockResult) TemplateD
 
 	return TemplateData{
 		Title:           "Stock Market Report",
-		GeneratedAt:     time.Now().Format("Monday, January 2, 2006 at 3:04 PM"),
+		GeneratedAt:     time.Now().Format("Monday, January 2, 2006"),
 		CategoryGroups:  groups,
 		TotalStocks:     len(results),
 		OversoldCount:   oversoldCount,
