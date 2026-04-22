@@ -3,6 +3,7 @@ package alerts
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 // grouped holds one row per ticker with all crossed thresholds merged.
@@ -51,7 +52,7 @@ func GenerateReport(alerts []Alert) string {
 <body>
 `)
 
-	sb.WriteString("<h2>🚨 Price Alerts</h2>\n")
+	sb.WriteString(fmt.Sprintf("<h2>🚨 Price Alerts — %s</h2>\n", time.Now().Format("02/01/2006")))
 	sb.WriteString("<table>\n")
 	sb.WriteString("  <tr><th>Stock</th><th>Ticker</th><th>Open</th><th>Current</th><th>Change</th></tr>\n")
 
