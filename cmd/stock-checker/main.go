@@ -62,7 +62,8 @@ func main() {
 	ticker := flag.String("ticker", "", "Ticker symbol to check (implies -check)")
 	verbose := flag.Bool("verbose", false, "Enable verbose logging")
 	timeout := flag.Duration("timeout", 5*time.Minute, "Timeout for the entire operation")
-	mock := flag.Bool("mock", false, "Use mock data instead of fetching from APIs (for testing report generation)")
+	mock       := flag.Bool("mock", false, "Use mock data instead of fetching from APIs (for testing report generation)")
+	noTwitter  := flag.Bool("no-twitter", false, "Skip Twitter fetching")
 	twitterOnly  := flag.Bool("twitter-only", false, "Fetch tweets and output a standalone analysis prompt (no Yahoo Finance)")
 	checkAlerts  := flag.Bool("check-alerts", false, "Check intraday price alerts and write report if any are triggered")
 	alertsOutput := flag.String("alerts-output", "alerts.html", "Path to write the alerts HTML report")
@@ -108,7 +109,10 @@ func main() {
 	}
 
 	// Fetch tweets if configured
-	xGroups := fetchAllXGroups(ctx, cfg, logger)
+	var xGroups []ai.XGroupSection
+	if !*noTwitter {
+		xGroups = fetchAllXGroups(ctx, cfg, logger)
+	}
 
 	// Mock report mode: skip Yahoo Finance API, generate manual prompt from mock data
 	if *mock {

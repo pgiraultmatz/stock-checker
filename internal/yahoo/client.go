@@ -45,12 +45,12 @@ type ChartResult struct {
 
 // ChartMeta contains metadata about the stock.
 type ChartMeta struct {
-	Symbol                      string  `json:"symbol"`
-	Currency                    string  `json:"currency"`
-	ExchangeName                string  `json:"exchangeName"`
-	RegularMarketPrice          float64 `json:"regularMarketPrice"`
-	RegularMarketPreviousClose  float64 `json:"regularMarketPreviousClose"`
-	ChartPreviousClose          float64 `json:"chartPreviousClose"`
+	Symbol                       string  `json:"symbol"`
+	Currency                     string  `json:"currency"`
+	ExchangeName                 string  `json:"exchangeName"`
+	RegularMarketPrice           float64 `json:"regularMarketPrice"`
+	RegularMarketPreviousClose   float64 `json:"regularMarketPreviousClose"`
+	ChartPreviousClose           float64 `json:"chartPreviousClose"`
 }
 
 // ChartIndicators contains the quote data.
@@ -84,53 +84,52 @@ type StockData struct {
 	PreviousClose float64
 }
 
-// GetPreviousDayClose fetches the previous trading day's close price.
-func (c *Client) GetPreviousDayClose(ctx context.Context, ticker string) (float64, error) {
+// GetPreviousDayClose fetches the last two trading days' close prices (J-1 and J-2).
+func (c *Client) GetPreviousDayClose(ctx context.Context, ticker string) (j1, j2 float64, err error) {
 	url := fmt.Sprintf("%s/%s?range=5d&interval=1d", c.config.BaseURL, ticker)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return 0, fmt.Errorf("creating request: %w", err)
+	req, err2 := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err2 != nil {
+		return 0, 0, fmt.Errorf("creating request: %w", err2)
 	}
 	req.Header.Set("User-Agent", c.config.UserAgent)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return 0, fmt.Errorf("executing request: %w", err)
+	resp, err2 := c.httpClient.Do(req)
+	if err2 != nil {
+		return 0, 0, fmt.Errorf("executing request: %w", err2)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return 0, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+		return 0, 0, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return 0, fmt.Errorf("reading response: %w", err)
+	body, err2 := io.ReadAll(resp.Body)
+	if err2 != nil {
+		return 0, 0, fmt.Errorf("reading response: %w", err2)
 	}
 
 	var chartResp ChartResponse
-	if err := json.Unmarshal(body, &chartResp); err != nil {
-		return 0, fmt.Errorf("parsing response: %w", err)
+	if err2 := json.Unmarshal(body, &chartResp); err2 != nil {
+		return 0, 0, fmt.Errorf("parsing response: %w", err2)
 	}
 
 	if chartResp.Chart.Error != nil {
-		return 0, fmt.Errorf("API error: %s - %s", chartResp.Chart.Error.Code, chartResp.Chart.Error.Description)
+		return 0, 0, fmt.Errorf("API error: %s - %s", chartResp.Chart.Error.Code, chartResp.Chart.Error.Description)
 	}
 
 	if len(chartResp.Chart.Result) == 0 {
-		return 0, fmt.Errorf("no data returned for %s", ticker)
+		return 0, 0, fmt.Errorf("no data returned for %s", ticker)
 	}
 
 	closes := chartResp.Chart.Result[0].Indicators.Quote[0].Close
-	if len(closes) < 2 {
-		return 0, fmt.Errorf("insufficient daily data for %s", ticker)
+	if len(closes) < 3 {
+		return 0, 0, fmt.Errorf("insufficient daily data for %s", ticker)
 	}
 
-	// Second-to-last is previous trading day's close
-	return closes[len(closes)-2], nil
+	return closes[len(closes)-2], closes[len(closes)-3], nil
 }
 
 // GetChartData fetches chart data for a ticker symbol.
