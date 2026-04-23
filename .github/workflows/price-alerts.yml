@@ -3,7 +3,7 @@ name: Price Alerts
 on:
   schedule:
     # Weekdays market hours — full check (stocks + crypto)
-    - cron: '0 8-21 * * 1-5'
+    - cron: '0,30 8-21 * * 1-5'
     # Weekday nights — crypto only
     - cron: '0 0-7,22-23 * * 1-5'
     # Weekends — crypto only
@@ -52,7 +52,7 @@ jobs:
           # workflow_dispatch has no schedule, so treat it as a full check
           EXTRA=""
           SCHED="${{ github.event.schedule }}"
-          if [[ -n "$SCHED" && "$SCHED" != "0 8-21 * * 1-5" ]]; then
+          if [[ -n "$SCHED" && "$SCHED" != "0,30 8-21 * * 1-5" ]]; then
             EXTRA="-crypto-only"
           fi
           ./stock-checker -config config.json -check-alerts $EXTRA -alerts-output alerts.html -verbose
