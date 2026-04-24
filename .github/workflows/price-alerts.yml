@@ -1,14 +1,16 @@
 name: Price Alerts
 
 on:
-  schedule:
-    # Weekdays market hours — full check (stocks + crypto)
-    - cron: '0,30 8-21 * * 1-5'
-    # Weekday nights — crypto only
-    - cron: '0 0-7,22-23 * * 1-5'
-    # Weekends — crypto only
-    - cron: '0 * * * 0,6'
   workflow_dispatch:
+    inputs:
+      crypto_only:
+        description: 'Check crypto only (skip stocks)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 env:
   GO_VERSION: '1.22'
@@ -48,11 +50,8 @@ jobs:
           GIST_ID: ${{ secrets.GIST_ID }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          # Pass -crypto-only for off-market-hours schedules
-          # workflow_dispatch has no schedule, so treat it as a full check
           EXTRA=""
-          SCHED="${{ github.event.schedule }}"
-          if [[ -n "$SCHED" && "$SCHED" != "0,30 8-21 * * 1-5" ]]; then
+          if [[ "${{ github.event.inputs.crypto_only }}" == "true" ]]; then
             EXTRA="-crypto-only"
           fi
           ./stock-checker -config config.json -check-alerts $EXTRA -alerts-output alerts.html -verbose
