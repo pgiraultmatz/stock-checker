@@ -1,9 +1,6 @@
 name: Daily Stock Report
 
 on:
-  schedule:
-    # Run at 5:00 UTC every day
-    - cron: '0 5 * * *'
   workflow_dispatch:
 
 env:
