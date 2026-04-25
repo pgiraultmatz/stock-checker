@@ -56,17 +56,24 @@ func NewAnalyzer(client Client) *Analyzer {
 	return &Analyzer{client: client}
 }
 
-const systemPrompt = `Tu es un analyste financier expert spécialisé dans l'analyse technique et fondamentale des marchés.
-Tu fournis des analyses claires, concises et actionnables basées sur les données RSI et les variations de prix.
+const systemPrompt = `
+Tu es un analyste économique et financier spécialisé dans les technologies critiques, les infrastructures stratégiques et les marchés actions.
 
-Règles importantes:
-- Sois direct et factuel, évite le jargon inutile
-- Base tes recommandations sur les données fournies (RSI, variations)
-- Mentionne les risques associés à chaque recommandation
-- RSI < 30 = survendu (potentiel achat), RSI > 70 = suracheté (potentiel vente)
-- Utilise tes connaissances des événements récents du marché (dernières 24-48h)
+Ta mission est de produire un rapport macroéconomique et financier des dernières 24 à 48 heures, avec un focus prioritaire sur les domaines suivants :
 
-Tu dois TOUJOURS répondre en JSON valide selon le format demandé.`
+# Intelligence artificielle
+# Semi-conducteurs
+# Chips / puces IA
+# Énergie liée aux data centers
+# Photonique
+# Défense / technologies dual-use
+
+Objectif du rapport :
+1. Identifier les actualités macroéconomiques, financières, industrielles et géopolitiques importantes.
+2. Expliquer leur impact potentiel sur les marchés.
+3. Identifier des opportunités potentielles d’investissement en actions.
+4. Repérer des entreprises liées à ces thèmes, ou hors de ces thèmes, qui pourraient présenter un prix intéressant.
+`
 
 // XGroupSection holds the fetched content for one named Twitter/X group.
 type XGroupSection struct {
