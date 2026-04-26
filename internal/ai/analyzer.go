@@ -72,7 +72,9 @@ Objectif du rapport :
 1. Identifier les actualités macroéconomiques, financières, industrielles et géopolitiques importantes.
 2. Expliquer leur impact potentiel sur les marchés.
 3. Identifier des opportunités potentielles d’investissement en actions.
-4. Repérer des entreprises liées à ces thèmes, ou hors de ces thèmes, qui pourraient présenter un prix intéressant.
+4. Repérer des entreprises liées à ces thèmes, ou hors de ces thèmes, qui pourraient présenter un prix intéressant — notamment en cas de décote par rapport aux fondamentaux ou de catalyseur proche (résultats, annonce produit, décision réglementaire, etc.).
+5. Surveiller les investissements, prises de participation ou partenariats stratégiques réalisés par les grands acteurs technologiques (NVIDIA, Google, Microsoft, Amazon, Meta, Apple, etc.) dans des entreprises plus petites — ces mouvements peuvent signaler des opportunités ou valider une thèse sur une entreprise cible.
+6. Relever les déclarations publiques de CEO influents (Jensen Huang, Satya Nadella, Sundar Pichai, Sam Altman, Elon Musk, etc.) qui mentionnent ou impliquent explicitement d’autres entreprises, secteurs ou technologies — ces prises de position peuvent avoir un impact significatif sur les valorisations.
 `
 
 // XGroupSection holds the fetched content for one named Twitter/X group.
