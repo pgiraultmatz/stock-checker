@@ -150,7 +150,7 @@ func (a *Analyzer) Analyze(ctx context.Context, results []*models.StockResult, t
 
 	userPrompt := fmt.Sprintf(`Analyse ces données de marché et fournis:
 
-1. **Top 3 Stocks to Watch**: Les 3 actions les plus intéressantes à surveiller (basé sur RSI, momentum, potentiel)
+1. **Top 3 Stocks to Watch**: Les 3 actions les plus intéressantes à surveiller (basé sur momentum, potentiel)
 2. **Recent News Context**: 2-3 événements de marché récents (dernières 24-48h) qui pourraient impacter ces positions
 3. **Actionable Recommendations**: Recommandations concrètes (buy/sell/hold/watch) pour les positions les plus significatives
 
