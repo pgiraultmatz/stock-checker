@@ -48,34 +48,14 @@ type Recommendation struct {
 
 // Analyzer performs AI-powered stock analysis.
 type Analyzer struct {
-	client Client
+	client     Client
+	promptPath string
 }
 
 // NewAnalyzer creates a new AI analyzer.
-func NewAnalyzer(client Client) *Analyzer {
-	return &Analyzer{client: client}
+func NewAnalyzer(client Client, promptPath string) *Analyzer {
+	return &Analyzer{client: client, promptPath: promptPath}
 }
-
-const systemPrompt = `
-Tu es un analyste économique et financier spécialisé dans les technologies critiques, les infrastructures stratégiques et les marchés actions.
-
-Ta mission est de produire un rapport macroéconomique et financier des dernières 24 à 48 heures, avec un focus prioritaire sur les domaines suivants :
-
-# Intelligence artificielle
-# Semi-conducteurs
-# Chips / puces IA
-# Énergie liée aux data centers
-# Photonique
-# Défense / technologies dual-use
-
-Objectif du rapport :
-1. Identifier les actualités macroéconomiques, financières, industrielles et géopolitiques importantes.
-2. Expliquer leur impact potentiel sur les marchés.
-3. Identifier des opportunités potentielles d’investissement en actions.
-4. Repérer des entreprises liées à ces thèmes, ou hors de ces thèmes, qui pourraient présenter un prix intéressant — notamment en cas de décote par rapport aux fondamentaux ou de catalyseur proche (résultats, annonce produit, décision réglementaire, etc.).
-5. Surveiller les investissements, prises de participation ou partenariats stratégiques réalisés par les grands acteurs technologiques (NVIDIA, Google, Microsoft, Amazon, Meta, Apple, etc.) dans des entreprises plus petites — ces mouvements peuvent signaler des opportunités ou valider une thèse sur une entreprise cible.
-6. Relever les déclarations publiques de CEO influents (Jensen Huang, Satya Nadella, Sundar Pichai, Sam Altman, Elon Musk, etc.) qui mentionnent ou impliquent explicitement d’autres entreprises, secteurs ou technologies — ces prises de position peuvent avoir un impact significatif sur les valorisations.
-`
 
 // XGroupSection holds the fetched content for one named Twitter/X group.
 type XGroupSection struct {
@@ -113,9 +93,6 @@ func BuildPrompt(results []*models.StockResult, promptPath string, ctx PromptCon
 	stockData := a.prepareStockData(results)
 
 	var sb strings.Builder
-	sb.WriteString("════════════════════════════════════════\n")
-	sb.WriteString("SECTION 1 — DONNÉES DE MARCHÉ\n")
-	sb.WriteString("════════════════════════════════════════\n\n")
 	sb.WriteString(string(template))
 	if ctx.VIXLine != "" {
 		sb.WriteString("\n**Indicateur de volatilité:**\n")
@@ -148,14 +125,12 @@ func (a *Analyzer) Analyze(ctx context.Context, results []*models.StockResult, t
 		twitterSection = "\n\nContexte additionnel — analyses récentes d'un trader quantitatif crypto:\n" + twitterContext
 	}
 
-	userPrompt := fmt.Sprintf(`Analyse ces données de marché et fournis:
+	systemPrompt, err := os.ReadFile(a.promptPath)
+	if err != nil {
+		return nil, fmt.Errorf("reading prompt %q: %w", a.promptPath, err)
+	}
 
-1. **Top 3 Stocks to Watch**: Les 3 actions les plus intéressantes à surveiller (basé sur momentum, potentiel)
-2. **Recent News Context**: 2-3 événements de marché récents (dernières 24-48h) qui pourraient impacter ces positions
-3. **Actionable Recommendations**: Recommandations concrètes (buy/sell/hold/watch) pour les positions les plus significatives
-
-Données actuelles du portefeuille:
-%s
+	userPrompt := fmt.Sprintf(`%s
 
 Réponds UNIQUEMENT en JSON valide avec cette structure exacte:
 {
@@ -171,7 +146,7 @@ Réponds UNIQUEMENT en JSON valide avec cette structure exacte:
   "market_summary": "Résumé en 1-2 phrases de la situation globale du portefeuille. Mentionne également les dates importantes des prochaines semaines pour ce portefeuille (publications de résultats, dividendes, décisions de banques centrales, indicateurs macro) en précisant les tickers concernés."
 }`, stockData+twitterSection)
 
-	response, err := a.client.Complete(ctx, systemPrompt, userPrompt, 2000)
+	response, err := a.client.Complete(ctx, string(systemPrompt), userPrompt, 2000)
 	if err != nil {
 		return nil, fmt.Errorf("AI completion failed: %w", err)
 	}

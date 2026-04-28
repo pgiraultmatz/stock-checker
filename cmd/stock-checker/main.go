@@ -54,7 +54,7 @@ func main() {
 
 	// Parse command line flags
 	configPath := flag.String("config", "config.json", "Path to configuration file")
-	promptPath := flag.String("prompt", "manual_prompt.txt", "Path to manual prompt template file")
+	promptPath := flag.String("prompt", "prompt.txt", "Path to prompt file")
 	twitterPromptPath := flag.String("twitter-prompt", "twitter_prompt.txt", "Path to Twitter-only prompt template file")
 	outputPath := flag.String("output", "", "Path to output HTML file (defaults to stdout)")
 	promptOutput := flag.String("prompt-output", "", "Path to write the generated prompt (optional)")
@@ -311,7 +311,7 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, p
 					APIKey:   apiKey,
 					Model:    cfg.AI.Model,
 				})
-				aiAnalyzer := ai.NewAnalyzer(aiClient)
+				aiAnalyzer := ai.NewAnalyzer(aiClient, promptPath)
 
 				var err error
 				aiAnalysis, err = aiAnalyzer.Analyze(ctx, results, ai.FormatXGroups(xGroups))
