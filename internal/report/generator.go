@@ -36,15 +36,26 @@ type VIXData struct {
 
 // TemplateData contains the data passed to the HTML template.
 type TemplateData struct {
-	Title           string
-	GeneratedAt     string
-	CategoryGroups  []CategoryGroupData
-	TotalStocks     int
-	OversoldCount   int
-	OverboughtCount int
-	AIAnalysis      *AIAnalysisData
-	ManualPrompt    string
-	VIX             *VIXData
+	Title            string
+	GeneratedAt      string
+	CategoryGroups   []CategoryGroupData
+	TotalStocks      int
+	OversoldCount    int
+	OverboughtCount  int
+	AIAnalysis       *AIAnalysisData
+	ManualPrompt     string
+	VIX              *VIXData
+	EarningsCalendar []EarningsEventData
+}
+
+// EarningsEventData represents a single upcoming earnings event.
+type EarningsEventData struct {
+	Ticker    string
+	Name      string
+	Date      string
+	DaysAway  int
+	DaysLabel string
+	Urgency   string // "urgent" (<7d), "upcoming" (7-30d), "future" (>30d)
 }
 
 // CategoryGroupData represents a category with its stocks for the template.
@@ -258,12 +269,13 @@ func (g *Generator) prepareTemplateData(results []*models.StockResult) TemplateD
 	}
 
 	return TemplateData{
-		Title:           "Stock Market Report",
-		GeneratedAt:     time.Now().Format("Monday, January 2, 2006"),
-		CategoryGroups:  groups,
-		TotalStocks:     len(results),
-		OversoldCount:   oversoldCount,
-		OverboughtCount: overboughtCount,
+		Title:            "Stock Market Report",
+		GeneratedAt:      time.Now().Format("Monday, January 2, 2006"),
+		CategoryGroups:   groups,
+		TotalStocks:      len(results),
+		OversoldCount:    oversoldCount,
+		OverboughtCount:  overboughtCount,
+		EarningsCalendar: g.buildEarningsCalendar(results),
 	}
 }
 
@@ -302,6 +314,58 @@ func (g *Generator) createStockRow(result *models.StockResult) StockRowData {
 		RSIStatus:     rsiStatus,
 		RSIStatusHTML: rsiStatusHTML,
 	}
+}
+
+// buildEarningsCalendar builds a sorted list of upcoming earnings events.
+func (g *Generator) buildEarningsCalendar(results []*models.StockResult) []EarningsEventData {
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	var events []EarningsEventData
+
+	for _, r := range results {
+		if r.NextEarningsDate == nil {
+			continue
+		}
+		t := *r.NextEarningsDate
+		eventDay := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, now.Location())
+		daysAway := int(eventDay.Sub(today).Hours() / 24)
+		if daysAway < 0 {
+			continue
+		}
+
+		daysLabel := fmt.Sprintf("dans %d j", daysAway)
+		if daysAway == 0 {
+			daysLabel = "Aujourd'hui"
+		} else if daysAway == 1 {
+			daysLabel = "Demain"
+		}
+
+		urgency := "future"
+		if daysAway < 7 {
+			urgency = "urgent"
+		} else if daysAway <= 30 {
+			urgency = "upcoming"
+		}
+
+		events = append(events, EarningsEventData{
+			Ticker:    r.Stock.Ticker,
+			Name:      r.Stock.Name,
+			Date:      t.Format("02 Jan 2006"),
+			DaysAway:  daysAway,
+			DaysLabel: daysLabel,
+			Urgency:   urgency,
+		})
+	}
+
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].DaysAway < events[j].DaysAway
+	})
+
+	if len(events) > 10 {
+		events = events[:10]
+	}
+
+	return events
 }
 
 // getCategoryEmoji returns the emoji for a category.

@@ -265,6 +265,10 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, p
 		"duration", elapsed.Round(time.Millisecond),
 	)
 
+	logger.Info("fetching earnings dates", "stocks", len(results))
+	analyzer.FetchEarningsDates(ctx, results)
+	logger.Info("earnings dates fetched")
+
 	if len(results) == 0 {
 		return fmt.Errorf("no stocks were successfully analyzed")
 	}

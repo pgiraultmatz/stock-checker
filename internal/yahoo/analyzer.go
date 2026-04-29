@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"math"
 	"sync"
+	"time"
 
 	"stock-checker/internal/analysis"
 	"stock-checker/internal/config"
@@ -74,6 +75,26 @@ func (a *Analyzer) AnalyzeStock(ctx context.Context, stock models.Stock) *models
 	result.RSI = a.rsiCalculator.Calculate(data.Closes)
 
 	return result
+}
+
+// FetchEarningsDates fetches the next earnings date for each result sequentially
+// by parsing Yahoo Finance quote pages, with 200ms between requests.
+func (a *Analyzer) FetchEarningsDates(ctx context.Context, results []*models.StockResult) {
+	for i, r := range results {
+		if i > 0 {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(200 * time.Millisecond):
+			}
+		}
+		date, err := a.client.GetNextEarningsDate(ctx, r.Stock.Ticker)
+		if err != nil {
+			a.logger.Warn("failed to fetch earnings date", "ticker", r.Stock.Ticker, "error", err)
+			continue
+		}
+		r.NextEarningsDate = date
+	}
 }
 
 // AnalyzeAll analyzes multiple stocks concurrently.

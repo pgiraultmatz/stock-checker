@@ -1,6 +1,8 @@
 // Package models defines the domain models for the stock checker application.
 package models
 
+import "time"
+
 // Stock represents a stock or financial instrument to track.
 type Stock struct {
 	Ticker   string `json:"ticker" yaml:"ticker"`
@@ -10,12 +12,13 @@ type Stock struct {
 
 // StockResult contains the analysis results for a stock.
 type StockResult struct {
-	Stock         Stock
-	CurrentPrice  float64
-	ChangePercent float64
-	RSI           float64
-	Currency      string
-	Error         error // Non-nil if analysis failed
+	Stock             Stock
+	CurrentPrice      float64
+	ChangePercent     float64
+	RSI               float64
+	Currency          string
+	NextEarningsDate  *time.Time
+	Error             error // Non-nil if analysis failed
 }
 
 // IsOversold returns true if RSI indicates oversold condition (< 30).

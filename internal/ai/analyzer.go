@@ -193,9 +193,13 @@ func (a *Analyzer) prepareStockData(results []*models.StockResult) string {
 				changeSign = "+"
 			}
 
-			sb.WriteString(fmt.Sprintf("- %s (%s): %.2f | %s%.2f%% | RSI: %.1f%s\n",
+			earningsSuffix := ""
+			if r.NextEarningsDate != nil {
+				earningsSuffix = fmt.Sprintf(" | Résultats: %s", r.NextEarningsDate.Format("02 Jan 2006"))
+			}
+			sb.WriteString(fmt.Sprintf("- %s (%s): %.2f | %s%.2f%% | RSI: %.1f%s%s\n",
 				r.Stock.Name, r.Stock.Ticker, r.CurrentPrice,
-				changeSign, r.ChangePercent, r.RSI, status))
+				changeSign, r.ChangePercent, r.RSI, status, earningsSuffix))
 		}
 	}
 
