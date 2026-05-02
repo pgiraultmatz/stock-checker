@@ -68,7 +68,7 @@
         /* VIX Banner */
         .vix-banner {
             display: flex;
-            align-items: center;
+            align-items: baseline;
             gap: 16px;
             padding: 14px 24px;
             border-bottom: 1px solid #d0d7de;
@@ -78,14 +78,14 @@
 
         .vix-label {
             font-weight: 700;
-            font-size: 13px;
+            font-size: 16px;
             color: #57606a;
             letter-spacing: 0.5px;
             text-transform: uppercase;
         }
 
         .vix-price {
-            font-size: 22px;
+            font-size: 16px;
             font-weight: 700;
             color: #24292f;
         }
@@ -105,6 +105,7 @@
             font-size: 12px;
             font-weight: 600;
             margin-left: auto;
+            align-self: center;
         }
 
         .vix-low      { background: #dafbe1; color: #116329; }
@@ -703,18 +704,37 @@
         </div>
         {{end}}
 
-        {{if .EarningsCalendar}}
+        {{if or .EarningsCalendar .EconomicEvents}}
         <div class="calendar-section">
-            <div class="calendar-title">📅 Prochains résultats</div>
-            <ul class="calendar-list">
-                {{range .EarningsCalendar}}
-                <li class="{{.Urgency}}">
-                    <span class="calendar-stock-name">{{.Name}}</span>
-                    <span class="calendar-stock-ticker">{{.Ticker}}</span>
-                    <span class="calendar-days-label">— {{.DaysLabel}}</span>
-                </li>
+            <div style="display:flex;gap:40px;flex-wrap:wrap;">
+                {{if .EarningsCalendar}}
+                <div>
+                    <div class="calendar-title">📅 Prochains résultats</div>
+                    <ul class="calendar-list">
+                        {{range .EarningsCalendar}}
+                        <li class="{{.Urgency}}">
+                            <span class="calendar-stock-name">{{.Name}}</span>
+                            <span class="calendar-stock-ticker">{{.Ticker}}</span>
+                            <span class="calendar-days-label">— {{.DaysLabel}}</span>
+                        </li>
+                        {{end}}
+                    </ul>
+                </div>
                 {{end}}
-            </ul>
+                {{if .EconomicEvents}}
+                <div>
+                    <div class="calendar-title">🏛️ Événements macro cette semaine</div>
+                    <ul class="calendar-list">
+                        {{range .EconomicEvents}}
+                        <li>
+                            <span class="calendar-stock-name">{{.Name}}</span>
+                            <span class="calendar-days-label">— {{.Date}}</span>
+                        </li>
+                        {{end}}
+                    </ul>
+                </div>
+                {{end}}
+            </div>
         </div>
         {{end}}
 

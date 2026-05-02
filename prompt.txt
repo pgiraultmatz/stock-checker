@@ -4,6 +4,7 @@ Analyse ces données de marché et fournis:
 2. **Recent News Context**: 2-3 événements de marché récents (dernières 24-48h) qui pourraient impacter ces positions
 3. **Actionable Recommendations**: Recommandations concrètes (buy/sell/hold/watch) pour les positions les plus significatives
 4. **Dates importantes à venir**: publications de résultats, dividendes, décisions de banques centrales, indicateurs macro des prochaines semaines — en précisant les tickers concernés
+5. **Insider Gov Trades**: Achats récents d'actions par des membres du Congrès américain ou hauts fonctionnaires (via STOCK Act disclosures) — préciser le nom, la fonction, le ticker, le montant estimé et la date de déclaration
 
 ---
 

@@ -46,6 +46,13 @@ type TemplateData struct {
 	ManualPrompt     string
 	VIX              *VIXData
 	EarningsCalendar []EarningsEventData
+	EconomicEvents   []EconomicEventData
+}
+
+// EconomicEventData represents a macro economic event for the template.
+type EconomicEventData struct {
+	Name  string
+	Date  string
 }
 
 // EarningsEventData represents a single upcoming earnings event.
@@ -192,11 +199,11 @@ func NewVIXData(price, changePercent float64) *VIXData {
 
 // Generate creates an HTML report from the analysis results.
 func (g *Generator) Generate(results []*models.StockResult) (string, error) {
-	return g.GenerateWithAI(results, nil, "", nil)
+	return g.GenerateWithAI(results, nil, "", nil, nil)
 }
 
 // GenerateWithAI creates an HTML report with optional AI analysis or manual prompt.
-func (g *Generator) GenerateWithAI(results []*models.StockResult, aiAnalysis *ai.Analysis, manualPrompt string, vix *VIXData) (string, error) {
+func (g *Generator) GenerateWithAI(results []*models.StockResult, aiAnalysis *ai.Analysis, manualPrompt string, vix *VIXData, economicEvents []EconomicEventData) (string, error) {
 	data := g.prepareTemplateData(results)
 
 	// Add AI analysis if provided
@@ -210,6 +217,7 @@ func (g *Generator) GenerateWithAI(results []*models.StockResult, aiAnalysis *ai
 	}
 
 	data.VIX = vix
+	data.EconomicEvents = economicEvents
 
 	var buf bytes.Buffer
 	if err := g.templates.ExecuteTemplate(&buf, "report.html", data); err != nil {

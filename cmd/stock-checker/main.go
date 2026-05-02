@@ -159,7 +159,7 @@ func runMockReport(outputPath string, promptPath string, logger *slog.Logger) er
 		return fmt.Errorf("creating report generator: %w", err)
 	}
 
-	htmlReport, err := generator.GenerateWithAI(results, nil, manualPrompt, nil)
+	htmlReport, err := generator.GenerateWithAI(results, nil, manualPrompt, nil, nil)
 	if err != nil {
 		return fmt.Errorf("generating mock report: %w", err)
 	}
@@ -330,13 +330,27 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, p
 		}
 	}
 
+	// Fetch economic events for the current week
+	var economicEvents []report.EconomicEventData
+	if events, err := yahooClient.GetEconomicEvents(ctx); err != nil {
+		logger.Warn("failed to fetch economic events, continuing without them", "error", err)
+	} else {
+		for _, e := range events {
+			economicEvents = append(economicEvents, report.EconomicEventData{
+				Name: e.Name,
+				Date: e.Date.Format("Mon 02 Jan, 15:04"),
+			})
+		}
+		logger.Info("economic events fetched", "count", len(economicEvents))
+	}
+
 	// Generate HTML report
 	generator, err := report.NewGenerator(cfg.GetCategoryEmoji(), cfg.GetCategoryOrder())
 	if err != nil {
 		return fmt.Errorf("creating report generator: %w", err)
 	}
 
-	htmlReport, err := generator.GenerateWithAI(results, aiAnalysis, manualPrompt, vixData)
+	htmlReport, err := generator.GenerateWithAI(results, aiAnalysis, manualPrompt, vixData, economicEvents)
 	if err != nil {
 		return fmt.Errorf("generating report: %w", err)
 	}
