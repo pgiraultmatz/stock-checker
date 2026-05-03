@@ -94,5 +94,30 @@ func mockStockResults() []*models.StockResult {
 			RSI:           65.3,
 			Currency:      "USD",
 		},
+		// Override test: strong fundamentals + earnings < 7d → should cap at BUY (not STRONG BUY)
+		{
+			Stock:            models.Stock{Ticker: "VST-T", Name: "VST Test (earnings cap)", Category: "Tech"},
+			CurrentPrice:     100.00,
+			ChangePercent:    1.5,
+			RSI:              42.0,
+			Currency:         "USD",
+			TargetPrice:      180.00,
+			PEGRatio:         0.6,
+			PSGRatio:         0.10,
+			EVGrossProfit:    6.0,
+			NextEarningsDate: ptr(time.Now().AddDate(0, 0, 5)),
+		},
+		// Override test: high EV/GP + earnings < 7d → should cap at HOLD
+		{
+			Stock:            models.Stock{Ticker: "SMR-T", Name: "SMR Test (evgp cap)", Category: "Energy"},
+			CurrentPrice:     100.00,
+			ChangePercent:    2.0,
+			RSI:              45.0,
+			Currency:         "USD",
+			TargetPrice:      155.00,
+			PSGRatio:         0.10,
+			EVGrossProfit:    223.8,
+			NextEarningsDate: ptr(time.Now().AddDate(0, 0, 4)),
+		},
 	}
 }

@@ -20,7 +20,7 @@
         }
 
         .container {
-            max-width: 900px;
+            max-width: 1100px;
             margin: 0 auto;
             background-color: #ffffff;
             border: 1px solid #d0d7de;
@@ -156,15 +156,16 @@
             text-align: right;
         }
 
-        .stock-header .sh-name { text-align: left; width: 35%; }
-        .stock-header .sh-price { width: 18%; }
-        .stock-header .sh-change { width: 17%; }
-        .stock-header .sh-rsi { width: 10%; }
-        .stock-header .sh-target { width: 14%; }
-        .stock-header .sh-valuation { text-align: center; width: 12%; }
-        .stock-header .sh-psg       { text-align: right; width: 8%; }
+        .stock-header .sh-name { text-align: left; width: 16%; }
+        .stock-header .sh-price { width: 8%; }
+        .stock-header .sh-change { width: 8%; }
+        .stock-header .sh-rsi { width: 13%; }
+        .stock-header .sh-target { width: 10%; }
+        .stock-header .sh-valuation { text-align: center; width: 10%; }
+        .stock-header .sh-psg       { text-align: right; width: 9%; }
         .stock-header .sh-evgp      { text-align: right; width: 9%; }
-        .stock-header .sh-earnings  { text-align: right; width: 8%; }
+        .stock-header .sh-earnings  { text-align: right; width: 6%; }
+        .stock-header .sh-signal    { text-align: center; width: 11%; }
 
         .stock-row {
             border-bottom: 1px solid #eaecef;
@@ -280,6 +281,16 @@
         .earnings-soon     { color: #cf222e; font-weight: 700; }
         .earnings-upcoming { color: #9a6700; font-weight: 600; }
         .earnings-later    { color: #8c959f; }
+
+        .stock-signal { text-align: center; width: 11%; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
+        .signal-strong-buy  { color: #1a7f37; }
+        .signal-buy         { color: #2da44e; }
+        .signal-accumulate  { color: #6e9a7a; }
+        .signal-hold        { color: #656d76; }
+        .signal-light-trim  { color: #9a6700; }
+        .signal-trim        { color: #bc4c00; }
+        .signal-sell        { color: #cf222e; }
+        .signal-strong-sell { color: #82071e; }
 
         .stock-psg { text-align: right; font-size: 11px; width: 8%; font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Droid Sans Mono', monospace; }
         .psg-very-attractive { color: #1a7f37; font-weight: 700; }
@@ -825,6 +836,7 @@
                         <th class="sh-psg">PSG*</th>
                         <th class="sh-evgp">EV/GP*</th>
                         <th class="sh-earnings">Earnings</th>
+                        <th class="sh-signal">Signal</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -841,6 +853,7 @@
                         <td class="stock-psg {{.PSGClass}}">{{if .PSGRatio}}<span style="color:#8c959f;font-weight:400">PSG</span> {{.PSGRatio}} <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px">{{.PSGLabel}}</span>{{end}}</td>
                         <td class="stock-evgp {{.EVGPClass}}">{{if .EVGPRatio}}<span style="color:#8c959f;font-weight:400">EV/GP</span> {{.EVGPRatio}} <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px">{{.EVGPLabel}}</span>{{end}}</td>
                         <td class="stock-earnings {{.EarningsClass}}">{{.Earnings}}</td>
+                        <td class="stock-signal {{.SignalClass}}">{{if .Signal}}{{.Signal}}{{if .SignalNote}}<br><span style="color:#9a6700;font-size:9px;font-weight:700;letter-spacing:0.3px">/ {{.SignalNote}}</span>{{end}}{{end}}</td>
                     </tr>
                     {{end}}
                 </tbody>
