@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/cookiejar"
+	"sync"
 	"time"
 
 	"stock-checker/internal/config"
@@ -16,16 +18,61 @@ import (
 type Client struct {
 	httpClient *http.Client
 	config     config.YahooAPIConfig
+	crumb      string
+	crumbOnce  sync.Once
 }
 
 // NewClient creates a new Yahoo Finance API client.
 func NewClient(cfg config.YahooAPIConfig) *Client {
+	jar, _ := cookiejar.New(nil)
 	return &Client{
 		httpClient: &http.Client{
 			Timeout: time.Duration(cfg.Timeout) * time.Second,
+			Jar:     jar,
 		},
 		config: cfg,
 	}
+}
+
+// initCrumb fetches the Yahoo Finance session cookie + crumb (called once).
+func (c *Client) initCrumb(ctx context.Context) error {
+	var initErr error
+	c.crumbOnce.Do(func() {
+		// 1. Hit the consent/login page to get session cookies.
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://fc.yahoo.com", nil)
+		if err != nil {
+			initErr = err
+			return
+		}
+		req.Header.Set("User-Agent", c.config.UserAgent)
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			initErr = err
+			return
+		}
+		resp.Body.Close()
+
+		// 2. Fetch the crumb.
+		req2, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://query2.finance.yahoo.com/v1/test/getcrumb", nil)
+		if err != nil {
+			initErr = err
+			return
+		}
+		req2.Header.Set("User-Agent", c.config.UserAgent)
+		resp2, err := c.httpClient.Do(req2)
+		if err != nil {
+			initErr = err
+			return
+		}
+		defer resp2.Body.Close()
+		body, err := io.ReadAll(resp2.Body)
+		if err != nil {
+			initErr = err
+			return
+		}
+		c.crumb = string(body)
+	})
+	return initErr
 }
 
 // ChartResponse represents the Yahoo Finance chart API response.

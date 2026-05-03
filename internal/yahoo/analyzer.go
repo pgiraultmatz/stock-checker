@@ -3,6 +3,7 @@ package yahoo
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"math"
 	"sync"
@@ -39,40 +40,67 @@ func NewAnalyzer(cfg *config.Config, logger *slog.Logger) *Analyzer {
 func (a *Analyzer) AnalyzeStock(ctx context.Context, stock models.Stock) *models.StockResult {
 	result := &models.StockResult{Stock: stock}
 
-	data, err := a.client.GetChartData(ctx, stock.Ticker)
-	if err != nil {
-		a.logger.Warn("failed to fetch stock data",
-			"ticker", stock.Ticker,
-			"error", err,
-		)
-		result.Error = err
+	// Fetch chart data and valuation concurrently.
+	type chartResult struct {
+		data *StockData
+		err  error
+	}
+	type valuationResult struct {
+		target, peg, psg, evgp float64
+		err                    error
+	}
+
+	chartCh := make(chan chartResult, 1)
+	valCh := make(chan valuationResult, 1)
+
+	go func() {
+		d, err := a.client.GetChartData(ctx, stock.Ticker)
+		chartCh <- chartResult{d, err}
+	}()
+	go func() {
+		v, err := a.client.GetValuation(ctx, stock.Ticker)
+		valCh <- valuationResult{v.TargetPrice, v.PEGRatio, v.PSGRatio, v.EVGrossProfit, err}
+	}()
+
+	cr := <-chartCh
+	if cr.err != nil {
+		a.logger.Warn("failed to fetch stock data", "ticker", stock.Ticker, "error", cr.err)
+		result.Error = cr.err
+		<-valCh
+		return result
+	}
+	if len(cr.data.Closes) < 15 {
+		a.logger.Warn("insufficient data for analysis", "ticker", stock.Ticker, "weeks", len(cr.data.Closes))
+		result.Error = fmt.Errorf("insufficient data")
+		<-valCh
 		return result
 	}
 
-	if len(data.Closes) < 15 {
-		a.logger.Warn("insufficient data for analysis",
-			"ticker", stock.Ticker,
-			"weeks", len(data.Closes),
-		)
-		result.Error = err
-		return result
-	}
-
-	result.CurrentPrice = data.CurrentPrice
-	result.Currency = data.Currency
+	result.CurrentPrice = cr.data.CurrentPrice
+	result.Currency = cr.data.Currency
 
 	j1, j2, err := a.client.GetPreviousDayClose(ctx, stock.Ticker)
 	if err != nil {
 		a.logger.Warn("failed to fetch daily closes", "ticker", stock.Ticker, "error", err)
 	} else if j1 > 0 {
-		change := ((data.CurrentPrice - j1) / j1) * 100
+		change := ((cr.data.CurrentPrice - j1) / j1) * 100
 		if math.Abs(change) < 0.05 && j2 > 0 {
 			change = ((j1 - j2) / j2) * 100
 		}
 		result.ChangePercent = change
 	}
 
-	result.RSI = a.rsiCalculator.Calculate(data.Closes)
+	result.RSI = a.rsiCalculator.Calculate(cr.data.Closes)
+
+	vr := <-valCh
+	if vr.err != nil {
+		a.logger.Warn("failed to fetch valuation", "ticker", stock.Ticker, "error", vr.err)
+	} else {
+		result.TargetPrice = vr.target
+		result.PEGRatio = vr.peg
+		result.PSGRatio = vr.psg
+		result.EVGrossProfit = vr.evgp
+	}
 
 	return result
 }

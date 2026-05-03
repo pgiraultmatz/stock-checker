@@ -75,6 +75,7 @@ type CategoryGroupData struct {
 // StockRowData represents a single stock row for the template.
 type StockRowData struct {
 	Name          string
+	Ticker        string
 	Price         string
 	Currency      string
 	Change        string
@@ -83,8 +84,20 @@ type StockRowData struct {
 	ChangeIcon    string
 	RSI           string
 	RSIValue      float64
-	RSIStatus     string
-	RSIStatusHTML template.HTML
+	RSIClass      string
+	RSILabel      string
+	TargetPrice   string
+	TargetPctHTML template.HTML
+	PEGRatio      string
+	ValuationHTML template.HTML
+	Earnings      string
+	EarningsClass string
+	PSGRatio      string
+	PSGLabel      string
+	PSGClass      string
+	EVGPRatio     string
+	EVGPLabel     string
+	EVGPClass     string
 }
 
 // AIAnalysisData contains AI analysis data for the template.
@@ -206,12 +219,9 @@ func (g *Generator) Generate(results []*models.StockResult) (string, error) {
 func (g *Generator) GenerateWithAI(results []*models.StockResult, aiAnalysis *ai.Analysis, manualPrompt string, vix *VIXData, economicEvents []EconomicEventData) (string, error) {
 	data := g.prepareTemplateData(results)
 
-	// Add AI analysis if provided
 	if aiAnalysis != nil {
 		data.AIAnalysis = g.convertAIAnalysis(aiAnalysis)
 	}
-
-	// Add manual prompt if provided
 	if manualPrompt != "" {
 		data.ManualPrompt = manualPrompt
 	}
@@ -299,18 +309,126 @@ func (g *Generator) createStockRow(result *models.StockResult) StockRowData {
 		changeIcon = "↓"
 	}
 
-	var rsiStatus string
-	var rsiStatusHTML template.HTML
-	if result.IsOversold() {
-		rsiStatus = "OVERSOLD"
-		rsiStatusHTML = template.HTML(`<span class="rsi-oversold">OVERSOLD</span>`)
-	} else if result.IsOverbought() {
-		rsiStatus = "OVERBOUGHT"
-		rsiStatusHTML = template.HTML(`<span class="rsi-overbought">OVERBOUGHT</span>`)
+	var rsiClass, rsiLabel string
+	switch {
+	case result.RSI < 30:
+		rsiClass = "rsi-strong-oversold"
+		rsiLabel = "STRONG OVERSOLD"
+	case result.RSI < 40:
+		rsiClass = "rsi-accumulation"
+		rsiLabel = "ACCUMULATION"
+	case result.RSI < 55:
+		rsiClass = "rsi-neutral"
+		rsiLabel = "NEUTRAL"
+	case result.RSI < 65:
+		rsiClass = "rsi-momentum"
+		rsiLabel = "MOMENTUM"
+	case result.RSI < 75:
+		rsiClass = "rsi-extended"
+		rsiLabel = "EXTENDED"
+	case result.RSI < 85:
+		rsiClass = "rsi-overbought"
+		rsiLabel = "OVERBOUGHT"
+	default:
+		rsiClass = "rsi-very-overbought"
+		rsiLabel = "VERY OVERBOUGHT"
+	}
+
+	// Target price with currency
+	var targetPrice, targetPctHTML string
+	if result.TargetPrice > 0 && result.CurrentPrice > 0 {
+		pct := (result.TargetPrice - result.CurrentPrice) / result.CurrentPrice * 100
+		currency := result.Currency
+		targetPrice = fmt.Sprintf("%.0f %s", result.TargetPrice, currency)
+		sign := "+"
+		cls := "target-up"
+		if pct < 0 {
+			sign = ""
+			cls = "target-down"
+		}
+		targetPctHTML = fmt.Sprintf(`<span class="%s">%s%.1f%%</span>`, cls, sign, pct)
+	}
+
+	// PEG ratio + valuation label
+	var pegStr, valuationHTML string
+	if result.PEGRatio > 0 {
+		pegStr = fmt.Sprintf("%.2f", result.PEGRatio)
+		switch {
+		case result.PEGRatio < 1:
+			valuationHTML = `<span class="val-under">UNDERVALUED</span>`
+		case result.PEGRatio < 1.5:
+			valuationHTML = `<span class="val-reasonable">REASONABLE</span>`
+		case result.PEGRatio < 2.2:
+			valuationHTML = `<span class="val-fair">FAIR</span>`
+		case result.PEGRatio < 3:
+			valuationHTML = `<span class="val-expensive">EXPENSIVE</span>`
+		default:
+			valuationHTML = `<span class="val-over">OVERVALUED</span>`
+		}
+	}
+
+	// EV / Gross Profit
+	var evgpStr, evgpLabel, evgpClass string
+	if result.EVGrossProfit > 0 {
+		evgpStr = fmt.Sprintf("%.1fx", result.EVGrossProfit)
+		switch {
+		case result.EVGrossProfit < 8:
+			evgpClass = "evgp-attractive"
+			evgpLabel = "ATTRACTIVE"
+		case result.EVGrossProfit < 15:
+			evgpClass = "evgp-reasonable"
+			evgpLabel = "REASONABLE"
+		case result.EVGrossProfit < 25:
+			evgpClass = "evgp-expensive"
+			evgpLabel = "EXPENSIVE"
+		default:
+			evgpClass = "evgp-very-expensive"
+			evgpLabel = "VERY EXPENSIVE"
+		}
+	}
+
+	// PSG ratio
+	var psgStr, psgClass, psgLabel string
+	if result.PSGRatio > 0 {
+		psgStr = fmt.Sprintf("%.2f", result.PSGRatio)
+		switch {
+		case result.PSGRatio < 0.15:
+			psgClass = "psg-very-attractive"
+			psgLabel = "ATTRACTIVE"
+		case result.PSGRatio < 0.30:
+			psgClass = "psg-reasonable"
+			psgLabel = "REASONABLE"
+		case result.PSGRatio < 0.50:
+			psgClass = "psg-expensive"
+			psgLabel = "EXPENSIVE"
+		default:
+			psgClass = "psg-very-expensive"
+			psgLabel = "PREMIUM"
+		}
+	}
+
+	// Next earnings date
+	var earnings, earningsClass string
+	if result.NextEarningsDate != nil {
+		now := time.Now()
+		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		d := *result.NextEarningsDate
+		day := time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, now.Location())
+		daysAway := int(day.Sub(today).Hours() / 24)
+		earnings = d.Format("Jan 2")
+		switch {
+		case daysAway <= 7:
+			earningsClass = "earnings-soon"
+		case daysAway <= 30:
+			earningsClass = "earnings-upcoming"
+		default:
+			earningsClass = "earnings-later"
+		}
 	}
 
 	return StockRowData{
 		Name:          result.Stock.Name,
+		Ticker:        result.Stock.Ticker,
 		Price:         fmt.Sprintf("%.2f", result.CurrentPrice),
 		Currency:      result.Currency,
 		Change:        fmt.Sprintf("%+.2f%%", result.ChangePercent),
@@ -319,8 +437,20 @@ func (g *Generator) createStockRow(result *models.StockResult) StockRowData {
 		ChangeIcon:    changeIcon,
 		RSI:           fmt.Sprintf("%.1f", result.RSI),
 		RSIValue:      result.RSI,
-		RSIStatus:     rsiStatus,
-		RSIStatusHTML: rsiStatusHTML,
+		RSIClass:      rsiClass,
+		RSILabel:      rsiLabel,
+		TargetPrice:   targetPrice,
+		TargetPctHTML: template.HTML(targetPctHTML),
+		PEGRatio:      pegStr,
+		ValuationHTML: template.HTML(valuationHTML),
+		Earnings:      earnings,
+		EarningsClass: earningsClass,
+		PSGRatio:      psgStr,
+		PSGLabel:      psgLabel,
+		PSGClass:      psgClass,
+		EVGPRatio:     evgpStr,
+		EVGPLabel:     evgpLabel,
+		EVGPClass:     evgpClass,
 	}
 }
 

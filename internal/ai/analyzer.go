@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -48,13 +47,13 @@ type Recommendation struct {
 
 // Analyzer performs AI-powered stock analysis.
 type Analyzer struct {
-	client     Client
-	promptPath string
+	client         Client
+	promptTemplate string
 }
 
-// NewAnalyzer creates a new AI analyzer.
-func NewAnalyzer(client Client, promptPath string) *Analyzer {
-	return &Analyzer{client: client, promptPath: promptPath}
+// NewAnalyzer creates a new AI analyzer with an already-loaded prompt template.
+func NewAnalyzer(client Client, promptTemplate string) *Analyzer {
+	return &Analyzer{client: client, promptTemplate: promptTemplate}
 }
 
 // XGroupSection holds the fetched content for one named Twitter/X group.
@@ -83,17 +82,13 @@ func FormatXGroups(groups []XGroupSection) string {
 	return sb.String()
 }
 
-// BuildPrompt returns the formatted prompt to copy-paste into the model or any other model.
-func BuildPrompt(results []*models.StockResult, promptPath string, ctx PromptContext) (string, error) {
-	template, err := os.ReadFile(promptPath)
-	if err != nil {
-		return "", fmt.Errorf("reading prompt template %q: %w", promptPath, err)
-	}
+// BuildPromptFromContent builds the prompt from an already-loaded template string.
+func BuildPromptFromContent(results []*models.StockResult, templateContent string, ctx PromptContext) (string, error) {
 	var a Analyzer
 	stockData := a.prepareStockData(results)
 
 	var sb strings.Builder
-	sb.WriteString(string(template))
+	sb.WriteString(templateContent)
 	if ctx.VIXLine != "" {
 		sb.WriteString("\n**Indicateur de volatilité:**\n")
 		sb.WriteString(ctx.VIXLine)
@@ -125,10 +120,7 @@ func (a *Analyzer) Analyze(ctx context.Context, results []*models.StockResult, t
 		twitterSection = "\n\nContexte additionnel — analyses récentes d'un trader quantitatif crypto:\n" + twitterContext
 	}
 
-	systemPrompt, err := os.ReadFile(a.promptPath)
-	if err != nil {
-		return nil, fmt.Errorf("reading prompt %q: %w", a.promptPath, err)
-	}
+	systemPrompt := []byte(a.promptTemplate)
 
 	userPrompt := fmt.Sprintf(`%s
 

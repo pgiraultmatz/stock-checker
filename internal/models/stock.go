@@ -18,7 +18,11 @@ type StockResult struct {
 	RSI               float64
 	Currency          string
 	NextEarningsDate  *time.Time
-	Error             error // Non-nil if analysis failed
+	TargetPrice       float64 // analyst mean price target (0 = not available)
+	PEGRatio          float64 // trailing PEG ratio, 5yr expected IBES (0 = not available)
+	PSGRatio          float64 // EV/fwdRevenue ÷ fwdRevenueGrowth% (0 = not available)
+	EVGrossProfit     float64 // EV / Gross Profit TTM (0 = not available)
+	Error             error   // Non-nil if analysis failed
 }
 
 // IsOversold returns true if RSI indicates oversold condition (< 30).

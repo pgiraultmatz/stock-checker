@@ -145,6 +145,27 @@
             border-collapse: collapse;
         }
 
+        .stock-header th {
+            padding: 6px 16px;
+            font-size: 10px;
+            font-weight: 600;
+            color: #8c959f;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #eaecef;
+            text-align: right;
+        }
+
+        .stock-header .sh-name { text-align: left; width: 35%; }
+        .stock-header .sh-price { width: 18%; }
+        .stock-header .sh-change { width: 17%; }
+        .stock-header .sh-rsi { width: 10%; }
+        .stock-header .sh-target { width: 14%; }
+        .stock-header .sh-valuation { text-align: center; width: 12%; }
+        .stock-header .sh-psg       { text-align: right; width: 8%; }
+        .stock-header .sh-evgp      { text-align: right; width: 9%; }
+        .stock-header .sh-earnings  { text-align: right; width: 8%; }
+
         .stock-row {
             border-bottom: 1px solid #eaecef;
             transition: background-color 0.15s ease;
@@ -168,6 +189,14 @@
             font-size: 12px;
             color: #24292f;
             width: 35%;
+        }
+
+        .stock-ticker {
+            font-size: 10px;
+            font-weight: 500;
+            color: #8c959f;
+            margin-left: 6px;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Droid Sans Mono', monospace;
         }
 
         .stock-price {
@@ -216,38 +245,59 @@
             text-align: right;
             font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Droid Sans Mono', monospace;
             font-size: 11px;
-            width: 15%;
+            width: 10%;
             color: #656d76;
         }
 
-        .stock-status {
+        .rsi-strong-oversold  { color: #cf222e; font-weight: 700; }
+        .rsi-accumulation     { color: #9a6700; font-weight: 600; }
+        .rsi-neutral          { color: #656d76; }
+        .rsi-momentum         { color: #2da44e; font-weight: 600; }
+        .rsi-extended         { color: #9a6700; font-weight: 600; }
+        .rsi-overbought       { color: #bc4c00; font-weight: 700; }
+        .rsi-very-overbought  { color: #cf222e; font-weight: 700; }
+
+        .stock-target {
+            text-align: right;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Droid Sans Mono', monospace;
+            font-size: 11px;
+            width: 14%;
+            color: #656d76;
+        }
+
+        .target-up   { color: #1a7f37; font-weight: 600; }
+        .target-down { color: #cf222e; font-weight: 600; }
+
+        .stock-valuation {
             text-align: center;
-            width: 15%;
+            width: 14%;
+            font-size: 10px;
+            color: #656d76;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Droid Sans Mono', monospace;
         }
 
-        .rsi-oversold {
-            display: inline-block;
-            background-color: #ffebe9;
-            color: #cf222e;
-            font-size: 10px;
-            font-weight: 700;
-            padding: 4px 8px;
-            border-radius: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+        .stock-earnings { text-align: right; font-size: 11px; width: 8%; font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Droid Sans Mono', monospace; }
+        .earnings-soon     { color: #cf222e; font-weight: 700; }
+        .earnings-upcoming { color: #9a6700; font-weight: 600; }
+        .earnings-later    { color: #8c959f; }
 
-        .rsi-overbought {
-            display: inline-block;
-            background-color: #dafbe1;
-            color: #1a7f37;
-            font-size: 10px;
-            font-weight: 700;
-            padding: 4px 8px;
-            border-radius: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+        .stock-psg { text-align: right; font-size: 11px; width: 8%; font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Droid Sans Mono', monospace; }
+        .psg-very-attractive { color: #1a7f37; font-weight: 700; }
+        .psg-reasonable      { color: #2da44e; font-weight: 600; }
+        .psg-expensive       { color: #9a6700; font-weight: 600; }
+        .psg-very-expensive  { color: #cf222e; font-weight: 700; }
+
+        .stock-evgp { text-align: right; font-size: 11px; width: 9%; font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Droid Sans Mono', monospace; }
+        .evgp-attractive    { color: #1a7f37; font-weight: 700; }
+        .evgp-reasonable    { color: #2da44e; font-weight: 600; }
+        .evgp-expensive     { color: #9a6700; font-weight: 600; }
+        .evgp-very-expensive { color: #cf222e; font-weight: 700; }
+
+        .val-under      { color: #1a7f37; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+        .val-reasonable { color: #2da44e; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+        .val-fair       { color: #9a6700; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+        .val-expensive  { color: #bc4c00; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+        .val-over       { color: #cf222e; font-size: 9px; font-weight: 700; text-transform: uppercase; }
 
         /* AI Analysis Section */
         .ai-section {
@@ -615,6 +665,23 @@
             box-shadow: 0 0 0 3px rgba(110, 64, 201, 0.25);
         }
 
+        .indicators-footnote {
+            padding: 16px 24px;
+            border-top: 1px solid #eaecef;
+            margin-top: 8px;
+        }
+
+        .indicators-footnote p {
+            font-size: 11px;
+            color: #8c959f;
+            line-height: 1.6;
+            margin: 4px 0;
+        }
+
+        .indicators-footnote strong {
+            color: #57606a;
+        }
+
         /* Footer */
         .footer {
             background-color: #f6f8fa;
@@ -747,16 +814,33 @@
                 </div>
             </div>
             <table class="stock-table">
+                <thead>
+                    <tr class="stock-header">
+                        <th class="sh-name">Name</th>
+                        <th class="sh-price">Price</th>
+                        <th class="sh-change">Change</th>
+                        <th class="sh-rsi">RSI</th>
+                        <th class="sh-target">Analyst Target</th>
+                        <th class="sh-valuation">PEG*</th>
+                        <th class="sh-psg">PSG*</th>
+                        <th class="sh-evgp">EV/GP*</th>
+                        <th class="sh-earnings">Earnings</th>
+                    </tr>
+                </thead>
                 <tbody>
                     {{range .Stocks}}
                     <tr class="stock-row">
-                        <td class="stock-name">{{.Name}}</td>
+                        <td class="stock-name">{{.Name}}<span class="stock-ticker">{{.Ticker}}</span></td>
                         <td class="stock-price">{{.Price}}{{if .Currency}}<span class="stock-currency">{{.Currency}}</span>{{end}}</td>
                         <td class="stock-change {{.ChangeClass}}">
                             <span class="change-icon">{{.ChangeIcon}}</span>{{.Change}}
                         </td>
-                        <td class="stock-rsi">RSI: {{.RSI}}</td>
-                        <td class="stock-status">{{.RSIStatusHTML}}</td>
+                        <td class="stock-rsi {{.RSIClass}}"><span style="color:#8c959f;font-weight:400">RSI</span> {{.RSI}} <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px">{{.RSILabel}}</span></td>
+                        <td class="stock-target">{{if .TargetPrice}}{{.TargetPrice}} {{.TargetPctHTML}}{{end}}</td>
+                        <td class="stock-valuation">{{if .PEGRatio}}PEG {{.PEGRatio}} {{.ValuationHTML}}{{end}}</td>
+                        <td class="stock-psg {{.PSGClass}}">{{if .PSGRatio}}<span style="color:#8c959f;font-weight:400">PSG</span> {{.PSGRatio}} <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px">{{.PSGLabel}}</span>{{end}}</td>
+                        <td class="stock-evgp {{.EVGPClass}}">{{if .EVGPRatio}}<span style="color:#8c959f;font-weight:400">EV/GP</span> {{.EVGPRatio}} <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px">{{.EVGPLabel}}</span>{{end}}</td>
+                        <td class="stock-earnings {{.EarningsClass}}">{{.Earnings}}</td>
                     </tr>
                     {{end}}
                 </tbody>
@@ -844,6 +928,12 @@
             </div>
         </div>
         {{end}}
+
+        <div class="indicators-footnote">
+            <p><strong>PEG*</strong> — Price/Earnings-to-Growth : rapport entre le P/E et la croissance bénéficiaire attendue sur 5 ans (consensus IBES). Mesure si la valorisation est justifiée par la croissance. &lt; 1 attractif, 1–1.5 raisonnable, 1.5–2.2 correct, 2.2–3 cher, &gt; 3 très cher.</p>
+            <p><strong>PSG*</strong> — Price/Sales-to-Growth : rapport entre l'EV/Revenus forward et la croissance des revenus attendue. Pertinent pour les sociétés en forte croissance sans P/E lisible. &lt; 0.15 très attractif, 0.15–0.30 raisonnable, 0.30–0.50 cher, &gt; 0.50 premium (cher mais acceptable pour une société de qualité).</p>
+            <p><strong>EV/GP*</strong> — Enterprise Value / Gross Profit : mesure la valorisation par rapport à la profitabilité brute (TTM). Moins sensible aux différences comptables que l'EV/EBITDA. &lt; 8x attractif, 8–15x raisonnable, 15–25x cher, &gt; 25x très cher.</p>
+        </div>
 
         {{if .ManualPrompt}}
         <div class="prompt-section">

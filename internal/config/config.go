@@ -214,6 +214,56 @@ func LoadAuto(path string) (*Config, error) {
 	return Load(path)
 }
 
+// LoadPromptFromGist fetches the prompt template from a GitHub Gist file named "prompt.txt".
+func LoadPromptFromGist(gistID, token string) (string, error) {
+	req, err := http.NewRequest(http.MethodGet, "https://api.github.com/gists/"+gistID, nil)
+	if err != nil {
+		return "", fmt.Errorf("creating gist request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("fetching gist: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("github API returned %d", resp.StatusCode)
+	}
+
+	var gist struct {
+		Files map[string]struct {
+			Content string `json:"content"`
+		} `json:"files"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&gist); err != nil {
+		return "", fmt.Errorf("decoding gist response: %w", err)
+	}
+
+	const filename = "prompt.txt"
+	f, ok := gist.Files[filename]
+	if !ok {
+		return "", fmt.Errorf("file %q not found in gist %s", filename, gistID)
+	}
+	return f.Content, nil
+}
+
+// LoadPrompt fetches the prompt template from the GitHub Gist (GIST_ID + GH_TOKEN required).
+func LoadPrompt() (string, error) {
+	gistID := os.Getenv("GIST_ID")
+	if gistID == "" {
+		return "", fmt.Errorf("GIST_ID is required to load the prompt")
+	}
+	token := os.Getenv("GH_TOKEN")
+	if token == "" {
+		return "", fmt.Errorf("GH_TOKEN is required to load the prompt")
+	}
+	slog.Info("loading prompt from GitHub Gist", "gist_id", gistID)
+	return LoadPromptFromGist(gistID, token)
+}
+
 // FindConfigFile searches for a config file in common locations.
 func FindConfigFile() (string, error) {
 	locations := []string{

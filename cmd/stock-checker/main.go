@@ -54,7 +54,6 @@ func main() {
 
 	// Parse command line flags
 	configPath := flag.String("config", "config.json", "Path to configuration file")
-	promptPath := flag.String("prompt", "prompt.txt", "Path to prompt file")
 	twitterPromptPath := flag.String("twitter-prompt", "twitter_prompt.txt", "Path to Twitter-only prompt template file")
 	outputPath := flag.String("output", "", "Path to output HTML file (defaults to stdout)")
 	promptOutput := flag.String("prompt-output", "", "Path to write the generated prompt (optional)")
@@ -108,19 +107,19 @@ func main() {
 		return
 	}
 
-	// Fetch tweets if configured
-	var xGroups []ai.XGroupSection
-	if !*noTwitter {
-		xGroups = fetchAllXGroups(ctx, cfg, logger)
-	}
-
-	// Mock report mode: skip Yahoo Finance API, generate manual prompt from mock data
+	// Mock report mode: skip all API calls
 	if *mock {
-		if err := runMockReport(*outputPath, *promptPath, logger); err != nil {
+		if err := runMockReport(*outputPath, logger); err != nil {
 			logger.Error("mock report failed", "error", err)
 			os.Exit(1)
 		}
 		return
+	}
+
+	// Fetch tweets if configured
+	var xGroups []ai.XGroupSection
+	if !*noTwitter {
+		xGroups = fetchAllXGroups(ctx, cfg, logger)
 	}
 
 	// Single stock check mode (triggered by -check or -ticker)
@@ -133,18 +132,23 @@ func main() {
 	}
 
 	// Full report mode
-	if err := runFullReport(ctx, cfg, *outputPath, *promptOutput, *promptPath, xGroups, logger); err != nil {
+	if err := runFullReport(ctx, cfg, *outputPath, *promptOutput, xGroups, logger); err != nil {
 		logger.Error("analysis failed", "error", err)
 		os.Exit(1)
 	}
 }
 
-func runMockReport(outputPath string, promptPath string, logger *slog.Logger) error {
+func runMockReport(outputPath string, logger *slog.Logger) error {
 	logger.Info("generating mock report with manual prompt (no API calls)")
 
 	results := mockStockResults()
 
-	manualPrompt, err := ai.BuildPrompt(results, promptPath, ai.PromptContext{})
+	promptTemplate, err := config.LoadPrompt()
+	if err != nil {
+		logger.Warn("failed to load prompt template", "error", err)
+	}
+
+	manualPrompt, err := ai.BuildPromptFromContent(results, promptTemplate, ai.PromptContext{})
 	if err != nil {
 		logger.Warn("failed to build manual prompt, continuing without it", "error", err)
 	} else {
@@ -246,7 +250,7 @@ func printStockResult(r *models.StockResult) {
 	fmt.Println()
 }
 
-func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, promptOutput string, promptPath string, xGroups []ai.XGroupSection, logger *slog.Logger) error {
+func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, promptOutput string, xGroups []ai.XGroupSection, logger *slog.Logger) error {
 	logger.Info("starting stock analysis",
 		"stocks", len(cfg.Stocks),
 		"concurrency", cfg.Concurrency,
@@ -282,17 +286,22 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, p
 		vixData = report.NewVIXData(vix.CurrentPrice, vix.ChangePercent)
 	}
 
+	// Load prompt template from Gist
+	promptTemplate, err := config.LoadPrompt()
+	if err != nil {
+		logger.Warn("failed to load prompt template, continuing without it", "error", err)
+	}
+
 	// Run AI analysis if enabled
 	var aiAnalysis *ai.Analysis
 	var manualPrompt string
 	if cfg.AI.Enabled {
 		if cfg.AI.Mode == "manual_prompt" {
-			var err error
 			promptCtx := ai.PromptContext{XGroups: xGroups}
 			if vixData != nil {
 				promptCtx.VIXLine = fmt.Sprintf("- VIX: %s (%s) — %s\n", vixData.Price, vixData.Change, vixData.Level)
 			}
-			manualPrompt, err = ai.BuildPrompt(results, promptPath, promptCtx)
+			manualPrompt, err = ai.BuildPromptFromContent(results, promptTemplate, promptCtx)
 			if err != nil {
 				logger.Warn("failed to build manual prompt, continuing without it", "error", err)
 			} else {
@@ -315,7 +324,7 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, p
 					APIKey:   apiKey,
 					Model:    cfg.AI.Model,
 				})
-				aiAnalyzer := ai.NewAnalyzer(aiClient, promptPath)
+				aiAnalyzer := ai.NewAnalyzer(aiClient, promptTemplate)
 
 				var err error
 				aiAnalysis, err = aiAnalyzer.Analyze(ctx, results, ai.FormatXGroups(xGroups))
