@@ -40,7 +40,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           echo "📊 Generating stock market report..."
-          ./stock-checker -config config.json -output report.html -verbose
+          ./stock-checker -config config.json -output report.html -prompt-output prompt.txt -verbose
           echo "✅ HTML report generated"
 
       - name: Send email report
@@ -52,6 +52,20 @@ jobs:
           password: ${{ secrets.EMAIL_PASSWORD }}
           subject: "Stock Market Report - ${{ steps.date.outputs.TODAY }}"
           html_body: file://report.html
+          to: ${{ secrets.EMAIL_RECIPIENT }}
+          from: Stock Analyzer <${{ secrets.EMAIL_USERNAME }}>
+          secure: true
+
+      - name: Send prompt email
+        if: hashFiles('prompt.txt') != ''
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "Stock Market Report - ${{ steps.date.outputs.TODAY }}"
+          body: file://prompt.txt
           to: ${{ secrets.EMAIL_RECIPIENT }}
           from: Stock Analyzer <${{ secrets.EMAIL_USERNAME }}>
           secure: true
