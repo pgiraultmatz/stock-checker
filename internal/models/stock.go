@@ -47,9 +47,11 @@ func (r *StockResult) IsNegative() bool {
 
 // Category represents a grouping of stocks with display metadata.
 type Category struct {
-	Name  string `json:"name" yaml:"name"`
-	Emoji string `json:"emoji" yaml:"emoji"`
-	Order int    `json:"order" yaml:"order"`
+	Name            string `json:"name" yaml:"name"`
+	Emoji           string `json:"emoji" yaml:"emoji"`
+	Order           int    `json:"order" yaml:"order"`
+	Narrative       string `json:"narrative" yaml:"narrative"`             // optional investment thesis
+	NarrativeScore  int    `json:"narrative_score" yaml:"narrative_score"` // optional 1-10, 0 = not set
 }
 
 // CategoryGroup represents a category with its associated stock results.

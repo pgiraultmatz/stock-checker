@@ -158,6 +158,11 @@ func runMockReport(outputPath string, logger *slog.Logger) error {
 	generator, err := report.NewGenerator(
 		map[string]string{"Tech": "zap", "Finance": "shield", "Energy": "us", "Crypto": "bitcoin"},
 		map[string]int{"Tech": 1, "Finance": 2, "Energy": 3, "Crypto": 4},
+		map[string]string{
+			"Tech":    "AI infrastructure buildout driving exceptional growth in data centers, semiconductors and cloud.",
+			"Finance": "Rate environment stabilizing; big banks well-capitalized but NIM pressure persists.",
+		},
+		map[string]int{"Tech": 8, "Finance": 6},
 	)
 	if err != nil {
 		return fmt.Errorf("creating report generator: %w", err)
@@ -354,7 +359,7 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, p
 	}
 
 	// Generate HTML report
-	generator, err := report.NewGenerator(cfg.GetCategoryEmoji(), cfg.GetCategoryOrder())
+	generator, err := report.NewGenerator(cfg.GetCategoryEmoji(), cfg.GetCategoryOrder(), cfg.GetCategoryNarrative(), cfg.GetCategoryNarrativeScore())
 	if err != nil {
 		return fmt.Errorf("creating report generator: %w", err)
 	}
@@ -362,6 +367,14 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, p
 	htmlReport, err := generator.GenerateWithAI(results, aiAnalysis, manualPrompt, vixData, economicEvents)
 	if err != nil {
 		return fmt.Errorf("generating report: %w", err)
+	}
+
+	// Save fundamentals to Gist so stock-portfolio can read them without re-fetching
+	signals := generator.ExtractSignals(results)
+	if err := config.SaveFundamentals(results, signals); err != nil {
+		logger.Warn("failed to save fundamentals to gist, continuing", "error", err)
+	} else {
+		logger.Info("fundamentals saved to gist")
 	}
 
 	// Output report

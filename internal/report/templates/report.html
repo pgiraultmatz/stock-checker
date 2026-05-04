@@ -139,6 +139,27 @@
             vertical-align: middle;
         }
 
+        .category-narrative {
+            font-size: 12px;
+            color: #57606a;
+            margin-top: 6px;
+            line-height: 1.5;
+        }
+
+        .narr-score {
+            display: inline-block;
+            margin-left: 10px;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 1px 7px;
+            border-radius: 10px;
+            vertical-align: middle;
+        }
+        .narr-score-high     { background: #dafbe1; color: #116329; }
+        .narr-score-medium   { background: #fff8c5; color: #7d4e00; }
+        .narr-score-low      { background: #fff0e6; color: #bc4c00; }
+        .narr-score-negative { background: #ffebe9; color: #82071e; }
+
         /* Stock Table */
         .stock-table {
             width: 100%;
@@ -309,6 +330,8 @@
         .val-fair       { color: #9a6700; font-size: 9px; font-weight: 700; text-transform: uppercase; }
         .val-expensive  { color: #bc4c00; font-size: 9px; font-weight: 700; text-transform: uppercase; }
         .val-over       { color: #cf222e; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+
+        .sig-note { color: #9a6700; font-size: 9px; font-weight: 700; letter-spacing: 0.3px; }
 
         /* AI Analysis Section */
         .ai-section {
@@ -822,7 +845,9 @@
                 <div class="category-title">
                     <span class="category-emoji">{{.Emoji}}</span>
                     <span>{{.Name}}</span>
+                    {{if .NarrativeScore}}<span class="narr-score {{.NarrScoreClass}}">{{.NarrativeScore}}/10</span>{{end}}
                 </div>
+                {{if .Narrative}}<div class="category-narrative">{{.Narrative}}</div>{{end}}
             </div>
             <table class="stock-table">
                 <thead>
@@ -831,10 +856,6 @@
                         <th class="sh-price">Price</th>
                         <th class="sh-change">Change</th>
                         <th class="sh-rsi">RSI</th>
-                        <th class="sh-target">Analyst Target</th>
-                        <th class="sh-valuation">PEG*</th>
-                        <th class="sh-psg">PSG*</th>
-                        <th class="sh-evgp">EV/GP*</th>
                         <th class="sh-earnings">Earnings</th>
                         <th class="sh-signal">Signal</th>
                     </tr>
@@ -842,18 +863,12 @@
                 <tbody>
                     {{range .Stocks}}
                     <tr class="stock-row">
-                        <td class="stock-name">{{.Name}}<span class="stock-ticker">{{.Ticker}}</span></td>
-                        <td class="stock-price">{{.Price}}{{if .Currency}}<span class="stock-currency">{{.Currency}}</span>{{end}}</td>
-                        <td class="stock-change {{.ChangeClass}}">
-                            <span class="change-icon">{{.ChangeIcon}}</span>{{.Change}}
-                        </td>
-                        <td class="stock-rsi {{.RSIClass}}"><span style="color:#8c959f;font-weight:400">RSI</span> {{.RSI}} <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px">{{.RSILabel}}</span></td>
-                        <td class="stock-target">{{if .TargetPrice}}{{.TargetPrice}} {{.TargetPctHTML}}{{end}}</td>
-                        <td class="stock-valuation">{{if .PEGRatio}}PEG {{.PEGRatio}} {{.ValuationHTML}}{{end}}</td>
-                        <td class="stock-psg {{.PSGClass}}">{{if .PSGRatio}}<span style="color:#8c959f;font-weight:400">PSG</span> {{.PSGRatio}} <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px">{{.PSGLabel}}</span>{{end}}</td>
-                        <td class="stock-evgp {{.EVGPClass}}">{{if .EVGPRatio}}<span style="color:#8c959f;font-weight:400">EV/GP</span> {{.EVGPRatio}} <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px">{{.EVGPLabel}}</span>{{end}}</td>
+                        <td class="stock-name">{{.Name}} <span class="stock-ticker">{{.Ticker}}</span></td>
+                        <td class="stock-price">{{.Price}}{{if .Currency}} <span class="stock-currency">{{.Currency}}</span>{{end}}</td>
+                        <td class="stock-change {{.ChangeClass}}"><span class="change-icon">{{.ChangeIcon}}</span>{{.Change}}</td>
+                        <td class="stock-rsi {{.RSIClass}}">{{.RSI}}</td>
                         <td class="stock-earnings {{.EarningsClass}}">{{.Earnings}}</td>
-                        <td class="stock-signal {{.SignalClass}}">{{if .Signal}}{{.Signal}}{{if .SignalNote}}<br><span style="color:#9a6700;font-size:9px;font-weight:700;letter-spacing:0.3px">/ {{.SignalNote}}</span>{{end}}{{end}}</td>
+                        <td class="stock-signal {{.SignalClass}}">{{if .Signal}}{{.Signal}}{{if .SignalNote}}<br><span class="sig-note">/ {{.SignalNote}}</span>{{end}}{{end}}</td>
                     </tr>
                     {{end}}
                 </tbody>
@@ -941,12 +956,6 @@
             </div>
         </div>
         {{end}}
-
-        <div class="indicators-footnote">
-            <p><strong>PEG*</strong> — Price/Earnings-to-Growth : rapport entre le P/E et la croissance bénéficiaire attendue sur 5 ans (consensus IBES). Mesure si la valorisation est justifiée par la croissance. &lt; 1 attractif, 1–1.5 raisonnable, 1.5–2.2 correct, 2.2–3 cher, &gt; 3 très cher.</p>
-            <p><strong>PSG*</strong> — Price/Sales-to-Growth : rapport entre l'EV/Revenus forward et la croissance des revenus attendue. Pertinent pour les sociétés en forte croissance sans P/E lisible. &lt; 0.15 très attractif, 0.15–0.30 raisonnable, 0.30–0.50 cher, &gt; 0.50 premium (cher mais acceptable pour une société de qualité).</p>
-            <p><strong>EV/GP*</strong> — Enterprise Value / Gross Profit : mesure la valorisation par rapport à la profitabilité brute (TTM). Moins sensible aux différences comptables que l'EV/EBITDA. &lt; 8x attractif, 8–15x raisonnable, 15–25x cher, &gt; 25x très cher.</p>
-        </div>
 
         {{if .ManualPrompt}}
         <div class="prompt-section">

@@ -2,12 +2,15 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"stock-checker/internal/models"
 )
@@ -155,6 +158,28 @@ func (c *Config) GetCategoryEmoji() map[string]string {
 	return emojis
 }
 
+// GetCategoryNarrative returns a map of category name to narrative description.
+func (c *Config) GetCategoryNarrative() map[string]string {
+	m := make(map[string]string)
+	for _, cat := range c.Categories {
+		if cat.Narrative != "" {
+			m[cat.Name] = cat.Narrative
+		}
+	}
+	return m
+}
+
+// GetCategoryNarrativeScore returns a map of category name to narrative score.
+func (c *Config) GetCategoryNarrativeScore() map[string]int {
+	m := make(map[string]int)
+	for _, cat := range c.Categories {
+		if cat.NarrativeScore != 0 {
+			m[cat.Name] = cat.NarrativeScore
+		}
+	}
+	return m
+}
+
 // LoadFromGist fetches configuration from a GitHub Gist file named "stock-config.json".
 func LoadFromGist(gistID, token string) (*Config, error) {
 	req, err := http.NewRequest(http.MethodGet, "https://api.github.com/gists/"+gistID, nil)
@@ -262,6 +287,96 @@ func LoadPrompt() (string, error) {
 	}
 	slog.Info("loading prompt from GitHub Gist", "gist_id", gistID)
 	return LoadPromptFromGist(gistID, token)
+}
+
+// StockFundamentals holds the pre-calculated data for a single stock.
+type StockFundamentals struct {
+	RSI           float64 `json:"rsi,omitempty"`
+	TargetPrice   float64 `json:"target_price,omitempty"`
+	TargetPct     float64 `json:"target_pct,omitempty"` // (target - price) / price * 100
+	PEGRatio      float64 `json:"peg_ratio,omitempty"`
+	PSGRatio      float64 `json:"psg_ratio,omitempty"`
+	EVGrossProfit float64 `json:"ev_gross_profit,omitempty"`
+	NextEarnings  string  `json:"next_earnings,omitempty"` // "2006-01-02" format
+	Signal        string  `json:"signal,omitempty"`
+	SignalNote    string  `json:"signal_note,omitempty"`
+}
+
+// StockDataFile is the structure written to stock-data.json in the Gist.
+type StockDataFile struct {
+	UpdatedAt time.Time                    `json:"updated_at"`
+	Stocks    map[string]StockFundamentals `json:"stocks"`
+}
+
+// SaveFundamentals writes computed fundamental data to stock-data.json in the Gist.
+// It is a no-op when GIST_ID is not set.
+func SaveFundamentals(results []*models.StockResult, signals map[string][2]string) error {
+	gistID := os.Getenv("GIST_ID")
+	if gistID == "" {
+		return nil
+	}
+	token := os.Getenv("GH_TOKEN")
+	if token == "" {
+		return fmt.Errorf("GH_TOKEN is required to save fundamentals")
+	}
+
+	data := StockDataFile{
+		UpdatedAt: time.Now().UTC(),
+		Stocks:    make(map[string]StockFundamentals, len(results)),
+	}
+	for _, r := range results {
+		if r.Error != nil {
+			continue
+		}
+		f := StockFundamentals{
+			RSI:           r.RSI,
+			TargetPrice:   r.TargetPrice,
+			PEGRatio:      r.PEGRatio,
+			PSGRatio:      r.PSGRatio,
+			EVGrossProfit: r.EVGrossProfit,
+		}
+		if r.TargetPrice > 0 && r.CurrentPrice > 0 {
+			f.TargetPct = (r.TargetPrice - r.CurrentPrice) / r.CurrentPrice * 100
+		}
+		if r.NextEarningsDate != nil {
+			f.NextEarnings = r.NextEarningsDate.Format("2006-01-02")
+		}
+		if sig, ok := signals[r.Stock.Ticker]; ok {
+			f.Signal = sig[0]
+			f.SignalNote = sig[1]
+		}
+		data.Stocks[r.Stock.Ticker] = f
+	}
+
+	content, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshalling fundamentals: %w", err)
+	}
+
+	payload, _ := json.Marshal(map[string]any{
+		"files": map[string]any{
+			"stock-data.json": map[string]any{"content": string(content)},
+		},
+	})
+
+	req, err := http.NewRequest(http.MethodPatch, "https://api.github.com/gists/"+gistID, bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("creating gist request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("patching gist: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("github API returned %d: %s", resp.StatusCode, body)
+	}
+	return nil
 }
 
 // FindConfigFile searches for a config file in common locations.

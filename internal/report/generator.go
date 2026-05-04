@@ -19,9 +19,11 @@ var templateFS embed.FS
 
 // Generator creates HTML reports from stock analysis results.
 type Generator struct {
-	templates      *template.Template
-	categoryEmojis map[string]string
-	categoryOrder  map[string]int
+	templates           *template.Template
+	categoryEmojis      map[string]string
+	categoryOrder       map[string]int
+	categoryNarrative   map[string]string
+	categoryNarrScore   map[string]int
 }
 
 // VIXData holds the VIX index data for display at the top of the report.
@@ -67,9 +69,12 @@ type EarningsEventData struct {
 
 // CategoryGroupData represents a category with its stocks for the template.
 type CategoryGroupData struct {
-	Name   string
-	Emoji  string
-	Stocks []StockRowData
+	Name            string
+	Emoji           string
+	Stocks          []StockRowData
+	Narrative       string
+	NarrativeScore  int
+	NarrScoreClass  string // color class based on score
 }
 
 // StockRowData represents a single stock row for the template.
@@ -145,7 +150,7 @@ type RecommendationData struct {
 }
 
 // NewGenerator creates a new report generator.
-func NewGenerator(categoryEmojis map[string]string, categoryOrder map[string]int) (*Generator, error) {
+func NewGenerator(categoryEmojis map[string]string, categoryOrder map[string]int, categoryNarrative map[string]string, categoryNarrScore map[string]int) (*Generator, error) {
 	funcMap := template.FuncMap{
 		"formatPrice": func(price float64) string {
 			return fmt.Sprintf("%.2f", price)
@@ -180,9 +185,11 @@ func NewGenerator(categoryEmojis map[string]string, categoryOrder map[string]int
 	}
 
 	return &Generator{
-		templates:      tmpl,
-		categoryEmojis: categoryEmojis,
-		categoryOrder:  categoryOrder,
+		templates:         tmpl,
+		categoryEmojis:    categoryEmojis,
+		categoryOrder:     categoryOrder,
+		categoryNarrative: categoryNarrative,
+		categoryNarrScore: categoryNarrScore,
 	}, nil
 }
 
@@ -284,10 +291,15 @@ func (g *Generator) prepareTemplateData(results []*models.StockResult) TemplateD
 	// Build category groups
 	groups := make([]CategoryGroupData, 0, len(categoryOrderList))
 	for _, catName := range categoryOrderList {
+		narrScore := g.categoryNarrScore[catName]
+		narrScoreClass := narrativeScoreClass(narrScore)
 		groups = append(groups, CategoryGroupData{
-			Name:   catName,
-			Emoji:  g.getCategoryEmoji(catName),
-			Stocks: categoryMap[catName],
+			Name:           catName,
+			Emoji:          g.getCategoryEmoji(catName),
+			Stocks:         categoryMap[catName],
+			Narrative:      g.categoryNarrative[catName],
+			NarrativeScore: narrScore,
+			NarrScoreClass: narrScoreClass,
 		})
 	}
 
@@ -300,6 +312,18 @@ func (g *Generator) prepareTemplateData(results []*models.StockResult) TemplateD
 		OverboughtCount:  overboughtCount,
 		EarningsCalendar: g.buildEarningsCalendar(results),
 	}
+}
+
+// ExtractSignals returns a map of ticker → [signal, signalNote] for all results.
+func (g *Generator) ExtractSignals(results []*models.StockResult) map[string][2]string {
+	out := make(map[string][2]string, len(results))
+	for _, r := range results {
+		_, signal, _, note := g.computeSignal(r)
+		if signal != "" {
+			out[r.Stock.Ticker] = [2]string{signal, note}
+		}
+	}
+	return out
 }
 
 // computeSignal computes a composite score and trading signal from all available indicators.
@@ -702,6 +726,23 @@ func (g *Generator) buildEarningsCalendar(results []*models.StockResult) []Earni
 	}
 
 	return events
+}
+
+// narrativeScoreClass returns a CSS class based on the narrative score (1-10).
+func narrativeScoreClass(score int) string {
+	if score == 0 {
+		return ""
+	}
+	switch {
+	case score >= 8:
+		return "narr-score-high"
+	case score >= 6:
+		return "narr-score-medium"
+	case score >= 4:
+		return "narr-score-low"
+	default:
+		return "narr-score-negative"
+	}
 }
 
 // getCategoryEmoji returns the emoji for a category.
