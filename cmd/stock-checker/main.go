@@ -56,7 +56,8 @@ func main() {
 	configPath := flag.String("config", "config.json", "Path to configuration file")
 	twitterPromptPath := flag.String("twitter-prompt", "twitter_prompt.txt", "Path to Twitter-only prompt template file")
 	outputPath := flag.String("output", "", "Path to output HTML file (defaults to stdout)")
-	promptOutput := flag.String("prompt-output", "", "Path to write the generated prompt (optional)")
+	promptOutput     := flag.String("prompt-output", "", "Path to write the generated prompt as plain text (optional)")
+	promptHTMLOutput := flag.String("prompt-html-output", "", "Path to write the generated prompt as a standalone HTML email (optional)")
 	check := flag.Bool("check", false, "Check a single stock (use -ticker to specify, random otherwise)")
 	ticker := flag.String("ticker", "", "Ticker symbol to check (implies -check)")
 	verbose := flag.Bool("verbose", false, "Enable verbose logging")
@@ -132,7 +133,7 @@ func main() {
 	}
 
 	// Full report mode
-	if err := runFullReport(ctx, cfg, *outputPath, *promptOutput, xGroups, logger); err != nil {
+	if err := runFullReport(ctx, cfg, *outputPath, *promptOutput, *promptHTMLOutput, xGroups, logger); err != nil {
 		logger.Error("analysis failed", "error", err)
 		os.Exit(1)
 	}
@@ -255,7 +256,7 @@ func printStockResult(r *models.StockResult) {
 	fmt.Println()
 }
 
-func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, promptOutput string, xGroups []ai.XGroupSection, logger *slog.Logger) error {
+func runFullReport(ctx context.Context, cfg *config.Config, outputPath, promptOutput, promptHTMLOutput string, xGroups []ai.XGroupSection, logger *slog.Logger) error {
 	logger.Info("starting stock analysis",
 		"stocks", len(cfg.Stocks),
 		"concurrency", cfg.Concurrency,
@@ -316,6 +317,14 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath string, p
 						logger.Warn("failed to write prompt to file", "path", promptOutput, "error", err)
 					} else {
 						logger.Info("prompt written", "path", promptOutput)
+					}
+				}
+				if promptHTMLOutput != "" {
+					html := buildPromptHTML(manualPrompt)
+					if err := os.WriteFile(promptHTMLOutput, []byte(html), 0644); err != nil {
+						logger.Warn("failed to write prompt HTML to file", "path", promptHTMLOutput, "error", err)
+					} else {
+						logger.Info("prompt HTML written", "path", promptHTMLOutput)
 					}
 				}
 			}
@@ -617,4 +626,34 @@ func getAICredentials(configuredProvider string) (string, ai.Provider) {
 	}
 
 	return "", ai.Provider(configuredProvider)
+}
+
+func buildPromptHTML(prompt string) string {
+	escaped := strings.NewReplacer(
+		"&", "&amp;", "<", "&lt;", ">", "&gt;",
+	).Replace(prompt)
+	return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#f6f8fa;padding:20px;margin:0}
+.wrap{max-width:900px;margin:0 auto;background:#fff;border:1px solid #d0d7de;border-radius:12px;overflow:hidden}
+.hdr{background:linear-gradient(135deg,#6e40c9 0%,#9a6dd7 100%);color:#fff;padding:24px;text-align:center}
+.hdr h2{font-size:20px;font-weight:700;margin:0 0 8px}
+.hdr p{font-size:13px;opacity:.9;margin:0}
+.body{padding:24px}
+pre{background:#1e1e2e;color:#cdd6f4;font-family:'SF Mono',Monaco,'Inconsolata',monospace;font-size:12px;line-height:1.6;padding:20px;border-radius:8px;white-space:pre-wrap;word-break:break-word;border:2px solid #313244;margin:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="hdr">
+<h2>💬 Prompt pour analyse IA</h2>
+<p>Copiez-collez ce prompt dans un modèle dIA pour obtenir votre analyse de marché.</p>
+</div>
+<div class="body"><pre>` + escaped + `</pre></div>
+</div>
+</body>
+</html>`
 }
