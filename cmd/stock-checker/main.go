@@ -110,7 +110,7 @@ func main() {
 
 	// Mock report mode: skip all API calls
 	if *mock {
-		if err := runMockReport(*outputPath, logger); err != nil {
+		if err := runMockReport(*outputPath, *promptHTMLOutput, logger); err != nil {
 			logger.Error("mock report failed", "error", err)
 			os.Exit(1)
 		}
@@ -139,7 +139,7 @@ func main() {
 	}
 }
 
-func runMockReport(outputPath string, logger *slog.Logger) error {
+func runMockReport(outputPath, promptHTMLOutput string, logger *slog.Logger) error {
 	logger.Info("generating mock report with manual prompt (no API calls)")
 
 	results := mockStockResults()
@@ -181,6 +181,13 @@ func runMockReport(outputPath string, logger *slog.Logger) error {
 		logger.Info("mock report written", "path", outputPath)
 	} else {
 		fmt.Println(htmlReport)
+	}
+
+	if promptHTMLOutput != "" && manualPrompt != "" {
+		if err := os.WriteFile(promptHTMLOutput, []byte(buildPromptHTML(manualPrompt)), 0644); err != nil {
+			return fmt.Errorf("writing prompt HTML to file: %w", err)
+		}
+		logger.Info("prompt HTML written", "path", promptHTMLOutput)
 	}
 
 	return nil
