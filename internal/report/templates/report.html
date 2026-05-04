@@ -640,64 +640,6 @@
         .calendar-list li.urgent .calendar-days-label { color: #cf222e; }
         .calendar-list li.upcoming .calendar-days-label { color: #9a6700; }
 
-        /* Manual Prompt Section */
-        .prompt-section {
-            border-top: 3px solid #6e40c9;
-            background: linear-gradient(180deg, #f8f4ff 0%, #ffffff 100%);
-        }
-
-        .prompt-header {
-            background: linear-gradient(135deg, #6e40c9 0%, #9a6dd7 100%);
-            color: #ffffff;
-            padding: 24px;
-            text-align: center;
-        }
-
-        .prompt-header h2 {
-            font-size: 20px;
-            font-weight: 700;
-            margin-bottom: 8px;
-        }
-
-        .prompt-header p {
-            font-size: 13px;
-            opacity: 0.9;
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        .prompt-hint {
-            display: inline-block;
-            margin-top: 12px;
-            font-size: 12px;
-            opacity: 0.75;
-            font-style: italic;
-        }
-
-        .prompt-content {
-            padding: 24px;
-        }
-
-        .prompt-code {
-            background-color: #1e1e2e;
-            color: #cdd6f4;
-            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', 'Droid Sans Mono', monospace;
-            font-size: 12px;
-            line-height: 1.6;
-            padding: 20px;
-            border-radius: 8px;
-            overflow-x: auto;
-            white-space: pre-wrap;
-            word-break: break-word;
-            border: 2px solid #313244;
-            outline: none;
-            cursor: text;
-        }
-
-        .prompt-code:focus {
-            border-color: #9a6dd7;
-            box-shadow: 0 0 0 3px rgba(110, 64, 201, 0.25);
-        }
 
         .indicators-footnote {
             padding: 16px 24px;
@@ -957,18 +899,6 @@
         </div>
         {{end}}
 
-        {{if .ManualPrompt}}
-        <div class="prompt-section">
-            <div class="prompt-header">
-                <h2>💬 Prompt pour analyse IA</h2>
-                <p>Copiez-collez ce prompt dans un modèle dIA pour obtenir votre analyse de marché.</p>
-                <span class="prompt-hint">Cliquez sur le bloc puis Ctrl+A / Cmd+A pour tout sélectionner</span>
-            </div>
-            <div class="prompt-content">
-                <pre class="prompt-code" tabindex="0">{{.ManualPrompt}}</pre>
-            </div>
-        </div>
-        {{end}}
 
         <div class="footer">
             <p>Generated automatically by Stock Checker</p>
