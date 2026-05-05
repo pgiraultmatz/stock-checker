@@ -5,9 +5,15 @@ import "time"
 
 // Stock represents a stock or financial instrument to track.
 type Stock struct {
-	Ticker   string `json:"ticker" yaml:"ticker"`
-	Name     string `json:"name" yaml:"name"`
-	Category string `json:"category" yaml:"category"`
+	Ticker      string `json:"ticker" yaml:"ticker"`
+	Name        string `json:"name" yaml:"name"`
+	Category    string `json:"category" yaml:"category"`
+	InPortfolio *bool  `json:"inPortfolio,omitempty" yaml:"inPortfolio,omitempty"`
+}
+
+// IsInPortfolio returns true when the stock is in the portfolio (nil = true by default).
+func (s Stock) IsInPortfolio() bool {
+	return s.InPortfolio == nil || *s.InPortfolio
 }
 
 // StockResult contains the analysis results for a stock.

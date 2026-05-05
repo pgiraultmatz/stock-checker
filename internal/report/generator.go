@@ -261,19 +261,27 @@ func (g *Generator) prepareTemplateData(results []*models.StockResult) TemplateD
 		return results[i].Stock.Name < results[j].Stock.Name
 	})
 
-	// Group by category
+	// Earnings calendar uses ALL stocks regardless of portfolio flag.
+	earningsCalendar := g.buildEarningsCalendar(results)
+
+	// Group by category — only portfolio stocks.
 	categoryMap := make(map[string][]StockRowData)
 	categoryOrderList := make([]string, 0)
 	oversoldCount := 0
 	overboughtCount := 0
+	portfolioCount := 0
 
 	for _, result := range results {
+		if !result.Stock.IsInPortfolio() {
+			continue
+		}
 		if _, exists := categoryMap[result.Stock.Category]; !exists {
 			categoryOrderList = append(categoryOrderList, result.Stock.Category)
 		}
 
 		row := g.createStockRow(result)
 		categoryMap[result.Stock.Category] = append(categoryMap[result.Stock.Category], row)
+		portfolioCount++
 
 		if result.IsOversold() {
 			oversoldCount++
@@ -307,10 +315,10 @@ func (g *Generator) prepareTemplateData(results []*models.StockResult) TemplateD
 		Title:            "Stock Market Report",
 		GeneratedAt:      time.Now().Format("Monday, January 2, 2006"),
 		CategoryGroups:   groups,
-		TotalStocks:      len(results),
+		TotalStocks:      portfolioCount,
 		OversoldCount:    oversoldCount,
 		OverboughtCount:  overboughtCount,
-		EarningsCalendar: g.buildEarningsCalendar(results),
+		EarningsCalendar: earningsCalendar,
 	}
 }
 

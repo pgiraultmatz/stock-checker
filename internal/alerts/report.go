@@ -54,7 +54,7 @@ func GenerateReport(alerts []Alert) string {
 
 	sb.WriteString(fmt.Sprintf("<h2>🚨 Price Alerts — %s</h2>\n", time.Now().Format("02/01/2006")))
 	sb.WriteString("<table>\n")
-	sb.WriteString("  <tr><th>Stock</th><th>Ticker</th><th>Open</th><th>Current</th><th>Change</th></tr>\n")
+	sb.WriteString("  <tr><th>Stock</th><th>Ticker</th><th>Category</th><th>Open</th><th>Current</th><th>Change</th></tr>\n")
 
 	for _, g := range groupByTicker(alerts) {
 		changeClass := "up"
@@ -67,12 +67,14 @@ func GenerateReport(alerts []Alert) string {
 			`  <tr>
     <td>%s</td>
     <td><strong>%s</strong></td>
+    <td style="color:#888;font-size:12px">%s</td>
     <td>%.2f</td>
     <td>%.2f</td>
     <td class="%s">%s%.2f%%</td>
   </tr>
 `,
 			g.Stock.Name, g.Stock.Ticker,
+			g.Stock.Category,
 			g.OpenPrice, g.CurrentPrice,
 			changeClass, changeSign, g.ChangePercent,
 		))
