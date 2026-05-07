@@ -282,7 +282,20 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath, promptOu
 		"duration", elapsed.Round(time.Millisecond),
 	)
 
-	logger.Info("fetching earnings dates", "stocks", len(results))
+	// Pre-populate earnings dates from existing Gist data to avoid re-fetching
+	existing := config.LoadFundamentals()
+	now := time.Now()
+	skipped := 0
+	for _, r := range results {
+		if f, ok := existing[r.Stock.Ticker]; ok && f.NextEarnings != "" {
+			t, err := time.Parse(time.RFC3339, f.NextEarnings)
+			if err == nil && t.After(now) {
+				r.NextEarningsDate = &t
+				skipped++
+			}
+		}
+	}
+	logger.Info("fetching earnings dates", "stocks", len(results)-skipped, "skipped", skipped)
 	analyzer.FetchEarningsDates(ctx, results)
 	logger.Info("earnings dates fetched")
 

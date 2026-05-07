@@ -297,7 +297,7 @@ type StockFundamentals struct {
 	PEGRatio      float64 `json:"peg_ratio,omitempty"`
 	PSGRatio      float64 `json:"psg_ratio,omitempty"`
 	EVGrossProfit float64 `json:"ev_gross_profit,omitempty"`
-	NextEarnings  string  `json:"next_earnings,omitempty"` // "2006-01-02" format
+	NextEarnings  string  `json:"next_earnings,omitempty"` // RFC3339 datetime
 	Signal        string  `json:"signal,omitempty"`
 	SignalNote    string  `json:"signal_note,omitempty"`
 }
@@ -339,7 +339,7 @@ func SaveFundamentals(results []*models.StockResult, signals map[string][2]strin
 			f.TargetPct = (r.TargetPrice - r.CurrentPrice) / r.CurrentPrice * 100
 		}
 		if r.NextEarningsDate != nil {
-			f.NextEarnings = r.NextEarningsDate.Format("2006-01-02")
+			f.NextEarnings = r.NextEarningsDate.UTC().Format(time.RFC3339)
 		}
 		if sig, ok := signals[r.Stock.Ticker]; ok {
 			f.Signal = sig[0]
@@ -377,6 +377,49 @@ func SaveFundamentals(results []*models.StockResult, signals map[string][2]strin
 		return fmt.Errorf("github API returned %d: %s", resp.StatusCode, body)
 	}
 	return nil
+}
+
+// LoadFundamentals reads stock-data.json from the Gist and returns the existing data.
+// Returns an empty map if GIST_ID is not set or the file is not found.
+func LoadFundamentals() map[string]StockFundamentals {
+	gistID := os.Getenv("GIST_ID")
+	token := os.Getenv("GH_TOKEN")
+	if gistID == "" || token == "" {
+		return nil
+	}
+
+	req, err := http.NewRequest(http.MethodGet, "https://api.github.com/gists/"+gistID, nil)
+	if err != nil {
+		return nil
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		return nil
+	}
+	defer resp.Body.Close()
+
+	var gist struct {
+		Files map[string]struct {
+			Content string `json:"content"`
+		} `json:"files"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&gist); err != nil {
+		return nil
+	}
+
+	f, ok := gist.Files["stock-data.json"]
+	if !ok {
+		return nil
+	}
+
+	var data StockDataFile
+	if err := json.Unmarshal([]byte(f.Content), &data); err != nil {
+		return nil
+	}
+	return data.Stocks
 }
 
 // FindConfigFile searches for a config file in common locations.

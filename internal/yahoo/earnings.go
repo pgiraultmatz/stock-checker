@@ -7,10 +7,21 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
 var earningsDateRe = regexp.MustCompile(`earningsDate.{0,15}raw.{0,15}:(\d{10})`)
+
+// matches "Today at 5 PM EDT", "Tomorrow at 10 AM EST", "May 8 at 4:30 PM EDT"
+var earningsCallTimeRe = regexp.MustCompile(`(?:Today|Tomorrow|[A-Z][a-z]+ \d{1,2}) at (\d+(?::\d+)?) (AM|PM) (E[DS]T|P[DS]T|C[DS]T|M[DS]T)`)
+
+var tzOffsets = map[string]int{
+	"EST": -5, "EDT": -4,
+	"CST": -6, "CDT": -5,
+	"MST": -7, "MDT": -6,
+	"PST": -8, "PDT": -7,
+}
 
 // GetNextEarningsDate fetches the next upcoming earnings date for a ticker
 // by parsing the Yahoo Finance quote page HTML.
@@ -40,12 +51,14 @@ func (c *Client) GetNextEarningsDate(ctx context.Context, ticker string) (*time.
 		return nil, fmt.Errorf("reading response: %w", err)
 	}
 
+	// Step 1: get the earnings date from the raw timestamp
 	matches := earningsDateRe.FindAllSubmatch(body, -1)
 	if len(matches) == 0 {
 		return nil, nil
 	}
 
 	now := time.Now()
+	var earningsDate *time.Time
 	for _, m := range matches {
 		ts, err := strconv.ParseInt(string(m[1]), 10, 64)
 		if err != nil {
@@ -53,9 +66,43 @@ func (c *Client) GetNextEarningsDate(ctx context.Context, ticker string) (*time.
 		}
 		t := time.Unix(ts, 0)
 		if t.After(now) {
-			return &t, nil
+			earningsDate = &t
+			break
+		}
+	}
+	if earningsDate == nil {
+		return nil, nil
+	}
+
+	// Step 2: try to find the exact call time from the page text
+	// e.g. "Today at 5 PM EDT" or "May 8 at 10 AM EDT"
+	callMatch := earningsCallTimeRe.FindSubmatch(body)
+	if callMatch != nil {
+		timeStr := string(callMatch[1]) // "5" or "10:30"
+		ampm := string(callMatch[2])    // "AM" or "PM"
+		tz := string(callMatch[3])      // "EDT"
+
+		offset, ok := tzOffsets[tz]
+		if ok {
+			var hour, minute int
+			parts := strings.SplitN(timeStr, ":", 2)
+			hour, _ = strconv.Atoi(parts[0])
+			if len(parts) == 2 {
+				minute, _ = strconv.Atoi(parts[1])
+			}
+			if ampm == "PM" && hour != 12 {
+				hour += 12
+			} else if ampm == "AM" && hour == 12 {
+				hour = 0
+			}
+			// Build timestamp: use earningsDate's calendar day in UTC, apply call time + tz offset
+			eastern := time.FixedZone(tz, offset*3600)
+			d := earningsDate.In(eastern)
+			callTime := time.Date(d.Year(), d.Month(), d.Day(), hour, minute, 0, 0, eastern)
+			utc := callTime.UTC()
+			return &utc, nil
 		}
 	}
 
-	return nil, nil
+	return earningsDate, nil
 }

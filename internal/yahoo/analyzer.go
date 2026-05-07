@@ -108,14 +108,19 @@ func (a *Analyzer) AnalyzeStock(ctx context.Context, stock models.Stock) *models
 // FetchEarningsDates fetches the next earnings date for each result sequentially
 // by parsing Yahoo Finance quote pages, with 200ms between requests.
 func (a *Analyzer) FetchEarningsDates(ctx context.Context, results []*models.StockResult) {
-	for i, r := range results {
-		if i > 0 {
+	first := true
+	for _, r := range results {
+		if r.NextEarningsDate != nil {
+			continue // already populated from cached Gist data
+		}
+		if !first {
 			select {
 			case <-ctx.Done():
 				return
 			case <-time.After(200 * time.Millisecond):
 			}
 		}
+		first = false
 		date, err := a.client.GetNextEarningsDate(ctx, r.Stock.Ticker)
 		if err != nil {
 			a.logger.Warn("failed to fetch earnings date", "ticker", r.Stock.Ticker, "error", err)
