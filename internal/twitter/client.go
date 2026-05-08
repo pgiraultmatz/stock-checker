@@ -64,9 +64,11 @@ func FormatTweets(username string, tweets []Tweet) string {
 	if len(tweets) == 0 {
 		return ""
 	}
+	const sep = "────────────────────────────────────────────────────────────"
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("## Tweets récents de l'utilisateur @%s\n", username))
-	sb.WriteString("\n")
+	sb.WriteString(sep + "\n")
+	sb.WriteString(fmt.Sprintf("Tweets récents de l'utilisateur @%s\n", username))
+	sb.WriteString(sep + "\n\n")
 	for i, t := range tweets {
 		date := t.CreatedAt.Format("02 Jan 2006 15:04")
 		sb.WriteString(fmt.Sprintf("%d. [%s]\n%s\n\n", i+1, date, t.Text))

@@ -633,11 +633,16 @@ func (g *Generator) createStockRow(result *models.StockResult) StockRowData {
 	var earnings, earningsClass string
 	if result.NextEarningsDate != nil {
 		now := time.Now()
+		paris, _ := time.LoadLocation("Europe/Paris")
 		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 		d := *result.NextEarningsDate
-		day := time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, now.Location())
+		dParis := d.In(paris)
+		day := time.Date(dParis.Year(), dParis.Month(), dParis.Day(), 0, 0, 0, 0, now.Location())
 		daysAway := int(day.Sub(today).Hours() / 24)
-		earnings = d.Format("Jan 2")
+		earnings = dParis.Format("Jan 2")
+		if dParis.Hour() != 0 {
+			earnings += dParis.Format(" · 15h04")
+		}
 		switch {
 		case daysAway <= 7:
 			earningsClass = "earnings-soon"
@@ -687,6 +692,7 @@ func (g *Generator) createStockRow(result *models.StockResult) StockRowData {
 // buildEarningsCalendar builds a sorted list of upcoming earnings events.
 func (g *Generator) buildEarningsCalendar(results []*models.StockResult) []EarningsEventData {
 	now := time.Now()
+	paris, _ := time.LoadLocation("Europe/Paris")
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	var events []EarningsEventData
 
@@ -695,7 +701,8 @@ func (g *Generator) buildEarningsCalendar(results []*models.StockResult) []Earni
 			continue
 		}
 		t := *r.NextEarningsDate
-		eventDay := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, now.Location())
+		tParis := t.In(paris)
+		eventDay := time.Date(tParis.Year(), tParis.Month(), tParis.Day(), 0, 0, 0, 0, now.Location())
 		daysAway := int(eventDay.Sub(today).Hours() / 24)
 		if daysAway < 0 {
 			continue
@@ -715,10 +722,15 @@ func (g *Generator) buildEarningsCalendar(results []*models.StockResult) []Earni
 			urgency = "upcoming"
 		}
 
+		dateStr := tParis.Format("02 Jan 2006")
+		if tParis.Hour() != 0 {
+			dateStr += tParis.Format(" · 15h04")
+		}
+
 		events = append(events, EarningsEventData{
 			Ticker:    r.Stock.Ticker,
 			Name:      r.Stock.Name,
-			Date:      t.Format("02 Jan 2006"),
+			Date:      dateStr,
 			DaysAway:  daysAway,
 			DaysLabel: daysLabel,
 			Urgency:   urgency,

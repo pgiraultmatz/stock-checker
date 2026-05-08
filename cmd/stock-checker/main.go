@@ -149,7 +149,63 @@ func runMockReport(outputPath, promptHTMLOutput string, logger *slog.Logger) err
 		logger.Warn("failed to load prompt template", "error", err)
 	}
 
-	manualPrompt, err := ai.BuildPromptFromContent(results, promptTemplate, ai.PromptContext{})
+	const mockSep = "────────────────────────────────────────────────────────────"
+	mockXGroups := []ai.XGroupSection{
+		{
+			Name: "Cryptos Traders",
+			Content: mockSep + `
+Tweets récents de l'utilisateur @CryptoBull
+` + mockSep + `
+
+1. [07 May 2026 22:14]
+BTC holding 68k strong. Next resistance at 72k, support at 65k. ETF inflows still very positive — accumulating on any dip under 67k.
+
+2. [07 May 2026 18:45]
+ETH/BTC ratio bouncing off lows. Ethereum rotation incoming? Layer 2 activity at ATH this week.
+
+3. [07 May 2026 11:02]
+Altseason not dead — just waiting for BTC dominance to peak around 57-58%. Watch MATIC and SOL closely.
+
+` + mockSep + `
+Tweets récents de l'utilisateur @MacroCryptoFR
+` + mockSep + `
+
+1. [08 May 2026 07:30]
+Fed meeting demain — si Powell reste dovish, BTC pourrait tester les 70k rapidement. Risk-on mode activé sur les marchés asiatiques ce matin.
+
+2. [07 May 2026 20:15]
+Liquidations massives de shorts hier soir. $85M en 4h. Le marché a nettoyé les positions faibles, bonne base pour la suite.
+`,
+		},
+		{
+			Name: "Tech & Semi Analysts",
+			Content: mockSep + `
+Tweets récents de l'utilisateur @SemiWatcher
+` + mockSep + `
+
+1. [08 May 2026 08:55]
+NVDA supply chain checks positive for Q3. TSMC N3 allocations mostly going to NVDA and Apple. AMD losing share at hyperscalers — their MI300X ramp slower than expected.
+
+2. [07 May 2026 17:30]
+Intel foundry customers still thin. TSMC moat widening. Watch for any Broadcom/AVGO custom silicon announcements at Google Next next week.
+
+3. [07 May 2026 14:00]
+Photonic interconnects becoming the real bottleneck for 2027 AI clusters. Ayar Labs, Celestial AI and Marvell all moving fast. $MRVL undervalued here.
+
+` + mockSep + `
+Tweets récents de l'utilisateur @AICapitalParis
+` + mockSep + `
+
+1. [08 May 2026 09:10]
+Kalray obtient un LOI d'un opérateur télécom européen pour déployer son processeur MPPA dans des applications edge 5G. Taille du deal pas divulguée mais pourrait être transformateur.
+
+2. [07 May 2026 21:45]
+Microsoft capex guidance Q3 > +40% YoY. Toute la chaîne data center en profite — $VRT, $ETN, $EATON en surveillance. Aussi regarder les équipementiers refroidissement liquide.
+`,
+		},
+	}
+
+	manualPrompt, err := ai.BuildPromptFromContent(results, promptTemplate, ai.PromptContext{XGroups: mockXGroups})
 	if err != nil {
 		logger.Warn("failed to build manual prompt, continuing without it", "error", err)
 	} else {
@@ -648,32 +704,96 @@ func getAICredentials(configuredProvider string) (string, ai.Provider) {
 	return "", ai.Provider(configuredProvider)
 }
 
+type promptSection struct {
+	title   string
+	content string
+}
+
+func splitPromptSections(prompt string) []promptSection {
+	lines := strings.Split(prompt, "\n")
+	var sections []promptSection
+	currentTitle := "Section 1 — Données & Instructions"
+	var currentLines []string
+
+	i := 0
+	for i < len(lines) {
+		line := lines[i]
+		if strings.HasPrefix(line, "════") {
+			content := strings.TrimSpace(strings.Join(currentLines, "\n"))
+			if content != "" {
+				sections = append(sections, promptSection{title: currentTitle, content: content})
+			}
+			i++
+			if i < len(lines) {
+				currentTitle = strings.TrimSpace(lines[i])
+			}
+			i++ // skip closing ════ line
+			currentLines = nil
+		} else {
+			currentLines = append(currentLines, line)
+		}
+		i++
+	}
+	if content := strings.TrimSpace(strings.Join(currentLines, "\n")); content != "" {
+		sections = append(sections, promptSection{title: currentTitle, content: content})
+	}
+	return sections
+}
+
 func buildPromptHTML(prompt string) string {
-	escaped := strings.NewReplacer(
-		"&", "&amp;", "<", "&lt;", ">", "&gt;",
-	).Replace(prompt)
+	escaper := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
+	sections := splitPromptSections(prompt)
+
+	var sb strings.Builder
+	for i, s := range sections {
+		id := fmt.Sprintf("sec%d", i)
+		sb.WriteString(fmt.Sprintf(`<div class="section">
+<div class="sec-hdr">
+<span class="sec-title">%s</span>
+<button class="copy-btn" onclick="copySection('%s')">Copier</button>
+</div>
+<pre id="%s">%s</pre>
+</div>
+`, escaper.Replace(s.title), id, id, escaper.Replace(s.content)))
+	}
+
 	return `<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <style>
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:#f6f8fa;padding:20px;margin:0}
-.wrap{max-width:900px;margin:0 auto;background:#fff;border:1px solid #d0d7de;border-radius:12px;overflow:hidden}
-.hdr{background:linear-gradient(135deg,#6e40c9 0%,#9a6dd7 100%);color:#fff;padding:24px;text-align:center}
+.wrap{max-width:960px;margin:0 auto}
+.hdr{background:linear-gradient(135deg,#6e40c9 0%,#9a6dd7 100%);color:#fff;padding:24px;text-align:center;border-radius:12px;margin-bottom:20px}
 .hdr h2{font-size:20px;font-weight:700;margin:0 0 8px}
 .hdr p{font-size:13px;opacity:.9;margin:0}
-.body{padding:24px}
-pre{background:#1e1e2e;color:#cdd6f4;font-family:'SF Mono',Monaco,'Inconsolata',monospace;font-size:12px;line-height:1.6;padding:20px;border-radius:8px;white-space:pre-wrap;word-break:break-word;border:2px solid #313244;margin:0}
+.section{background:#fff;border:1px solid #d0d7de;border-radius:12px;overflow:hidden;margin-bottom:16px}
+.sec-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#f0eafa;border-bottom:1px solid #d0d7de}
+.sec-title{font-size:13px;font-weight:700;color:#6e40c9;letter-spacing:.03em}
+.copy-btn{font-size:12px;font-weight:600;color:#6e40c9;background:#fff;border:1px solid #b39ddb;border-radius:6px;padding:4px 12px;cursor:pointer;transition:background .15s}
+.copy-btn:hover{background:#ede7f6}
+.copy-btn.copied{color:#2e7d32;border-color:#a5d6a7;background:#f1f8f1}
+pre{background:#1e1e2e;color:#cdd6f4;font-family:'SF Mono',Monaco,'Inconsolata',monospace;font-size:12px;line-height:1.6;padding:20px;white-space:pre-wrap;word-break:break-word;margin:0}
 </style>
 </head>
 <body>
 <div class="wrap">
 <div class="hdr">
-<h2>💬 Prompt pour analyse IA</h2>
-<p>Copiez-collez ce prompt dans un modèle dIA pour obtenir votre analyse de marché.</p>
+<h2>Prompt pour analyse IA</h2>
+<p>Copiez chaque section et collez-la dans un modèle dIA.</p>
 </div>
-<div class="body"><pre>` + escaped + `</pre></div>
-</div>
+` + sb.String() + `</div>
+<script>
+function copySection(id) {
+  const text = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('[onclick="copySection(\'' + id + '\')"]');
+    btn.textContent = 'Copié !';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copier'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+</script>
 </body>
 </html>`
 }
