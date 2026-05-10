@@ -13,14 +13,21 @@ import (
 
 var earningsDateRe = regexp.MustCompile(`earningsDate.{0,15}raw.{0,15}:(\d{10})`)
 
-// matches "Today at 5 PM EDT", "Tomorrow at 10 AM EST", "May 8 at 4:30 PM EDT"
-var earningsCallTimeRe = regexp.MustCompile(`(?:Today|Tomorrow|[A-Z][a-z]+ \d{1,2}) at (\d+(?::\d+)?) (AM|PM) (E[DS]T|P[DS]T|C[DS]T|M[DS]T)`)
+// captures full match: "May 11 at 5 PM EDT" → groups: date, time, AM/PM, tz
+var earningsCallTimeRe = regexp.MustCompile(`(Today|Tomorrow|([A-Z][a-z]+) (\d{1,2})) at (\d+(?::\d+)?) (AM|PM) (E[DS]T|P[DS]T|C[DS]T|M[DS]T)`)
 
 var tzOffsets = map[string]int{
 	"EST": -5, "EDT": -4,
 	"CST": -6, "CDT": -5,
 	"MST": -7, "MDT": -6,
 	"PST": -8, "PDT": -7,
+}
+
+var monthNames = map[string]time.Month{
+	"Jan": time.January, "Feb": time.February, "Mar": time.March,
+	"Apr": time.April, "May": time.May, "Jun": time.June,
+	"Jul": time.July, "Aug": time.August, "Sep": time.September,
+	"Oct": time.October, "Nov": time.November, "Dec": time.December,
 }
 
 // GetNextEarningsDate fetches the next upcoming earnings date for a ticker
@@ -74,34 +81,54 @@ func (c *Client) GetNextEarningsDate(ctx context.Context, ticker string) (*time.
 		return nil, nil
 	}
 
-	// Step 2: try to find the exact call time from the page text
-	// e.g. "Today at 5 PM EDT" or "May 8 at 10 AM EDT"
-	callMatch := earningsCallTimeRe.FindSubmatch(body)
-	if callMatch != nil {
-		timeStr := string(callMatch[1]) // "5" or "10:30"
-		ampm := string(callMatch[2])    // "AM" or "PM"
-		tz := string(callMatch[3])      // "EDT"
+	// Step 2: find all call-time mentions and pick the one whose date matches earningsDate.
+	// We iterate all matches to avoid picking up a stale previous-quarter mention first.
+	callMatches := earningsCallTimeRe.FindAllSubmatch(body, -1)
+	for _, cm := range callMatches {
+		dateLabel := string(cm[1]) // "Today", "Tomorrow", or "May 11"
+		monthStr := string(cm[2])  // "May" (empty for Today/Tomorrow)
+		dayStr := string(cm[3])    // "11"  (empty for Today/Tomorrow)
+		timeStr := string(cm[4])   // "5" or "10:30"
+		ampm := string(cm[5])      // "AM" or "PM"
+		tz := string(cm[6])        // "EDT"
 
 		offset, ok := tzOffsets[tz]
-		if ok {
-			var hour, minute int
-			parts := strings.SplitN(timeStr, ":", 2)
-			hour, _ = strconv.Atoi(parts[0])
-			if len(parts) == 2 {
-				minute, _ = strconv.Atoi(parts[1])
-			}
-			if ampm == "PM" && hour != 12 {
-				hour += 12
-			} else if ampm == "AM" && hour == 12 {
-				hour = 0
-			}
-			// Build timestamp: use earningsDate's calendar day in UTC, apply call time + tz offset
-			eastern := time.FixedZone(tz, offset*3600)
-			d := earningsDate.In(eastern)
-			callTime := time.Date(d.Year(), d.Month(), d.Day(), hour, minute, 0, 0, eastern)
-			utc := callTime.UTC()
-			return &utc, nil
+		if !ok {
+			continue
 		}
+		eastern := time.FixedZone(tz, offset*3600)
+		ed := earningsDate.In(eastern)
+
+		// Verify the matched date corresponds to earningsDate's calendar day.
+		switch dateLabel {
+		case "Today", "Tomorrow":
+			// "Today/Tomorrow" on the Yahoo page is reliable — it refers to the current call.
+		default:
+			mon, ok := monthNames[monthStr]
+			if !ok {
+				continue
+			}
+			day, _ := strconv.Atoi(dayStr)
+			if mon != ed.Month() || day != ed.Day() {
+				continue // date mismatch — skip this match (likely a past quarter mention)
+			}
+		}
+
+		var hour, minute int
+		parts := strings.SplitN(timeStr, ":", 2)
+		hour, _ = strconv.Atoi(parts[0])
+		if len(parts) == 2 {
+			minute, _ = strconv.Atoi(parts[1])
+		}
+		if ampm == "PM" && hour != 12 {
+			hour += 12
+		} else if ampm == "AM" && hour == 12 {
+			hour = 0
+		}
+
+		callTime := time.Date(ed.Year(), ed.Month(), ed.Day(), hour, minute, 0, 0, eastern)
+		utc := callTime.UTC()
+		return &utc, nil
 	}
 
 	return earningsDate, nil
