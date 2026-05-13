@@ -58,8 +58,9 @@ func NewAnalyzer(client Client, promptTemplate string) *Analyzer {
 
 // XGroupSection holds the fetched content for one named Twitter/X group.
 type XGroupSection struct {
-	Name    string
-	Content string
+	Name     string
+	Accounts []string // Twitter/X handles that contributed content
+	Content  string
 }
 
 // PromptContext holds optional context sections to include in the prompt.
@@ -100,8 +101,16 @@ func BuildPromptFromContent(results []*models.StockResult, templateContent strin
 		if group.Content == "" {
 			continue
 		}
+		userSuffix := ""
+		if len(group.Accounts) > 0 {
+			handles := make([]string, len(group.Accounts))
+			for j, a := range group.Accounts {
+				handles[j] = "@" + a
+			}
+			userSuffix = " - user " + strings.Join(handles, ", ")
+		}
 		sb.WriteString(fmt.Sprintf("\n\n════════════════════════════════════════\n"))
-		sb.WriteString(fmt.Sprintf("SECTION %d — %s\n", i+2, strings.ToUpper(group.Name)))
+		sb.WriteString(fmt.Sprintf("SECTION %d — %s%s\n", i+2, strings.ToUpper(group.Name), userSuffix))
 		sb.WriteString("════════════════════════════════════════\n\n")
 		sb.WriteString(group.Content)
 	}

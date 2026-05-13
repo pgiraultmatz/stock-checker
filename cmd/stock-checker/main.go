@@ -647,6 +647,7 @@ func fetchAllXGroups(ctx context.Context, cfg *config.Config, logger *slog.Logge
 	first := true
 	for _, group := range cfg.XGroups {
 		var groupBuf strings.Builder
+		var activeAccounts []string
 		for _, account := range group.Accounts {
 			account = strings.TrimSpace(account)
 			if account == "" {
@@ -666,11 +667,15 @@ func fetchAllXGroups(ctx context.Context, cfg *config.Config, logger *slog.Logge
 			tweets = twitter.FilterRecent(tweets)
 			logger.Info("tweets after filter", "group", group.Name, "user", account, "recent", len(tweets))
 			if section := twitter.FormatTweets(account, tweets); section != "" {
+				if len(group.Accounts) > 1 {
+					groupBuf.WriteString(fmt.Sprintf("@%s:\n", account))
+				}
 				groupBuf.WriteString(section)
+				activeAccounts = append(activeAccounts, account)
 			}
 		}
 		if groupBuf.Len() > 0 {
-			result = append(result, ai.XGroupSection{Name: group.Name, Content: groupBuf.String()})
+			result = append(result, ai.XGroupSection{Name: group.Name, Accounts: activeAccounts, Content: groupBuf.String()})
 		}
 	}
 	return result
@@ -750,11 +755,10 @@ func buildPromptHTML(prompt string) string {
 		sb.WriteString(fmt.Sprintf(`<div class="section">
 <div class="sec-hdr">
 <span class="sec-title">%s</span>
-<button class="copy-btn" onclick="copySection('%s')">Copier</button>
 </div>
 <pre id="%s">%s</pre>
 </div>
-`, escaper.Replace(s.title), id, id, escaper.Replace(s.content)))
+`, escaper.Replace(s.title), id, escaper.Replace(s.content)))
 	}
 
 	return `<!DOCTYPE html>
@@ -768,11 +772,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-s
 .hdr h2{font-size:20px;font-weight:700;margin:0 0 8px}
 .hdr p{font-size:13px;opacity:.9;margin:0}
 .section{background:#fff;border:1px solid #d0d7de;border-radius:12px;overflow:hidden;margin-bottom:16px}
-.sec-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#f0eafa;border-bottom:1px solid #d0d7de}
+.sec-hdr{padding:12px 16px;background:#f0eafa;border-bottom:1px solid #d0d7de}
 .sec-title{font-size:13px;font-weight:700;color:#6e40c9;letter-spacing:.03em}
-.copy-btn{font-size:12px;font-weight:600;color:#6e40c9;background:#fff;border:1px solid #b39ddb;border-radius:6px;padding:4px 12px;cursor:pointer;transition:background .15s}
-.copy-btn:hover{background:#ede7f6}
-.copy-btn.copied{color:#2e7d32;border-color:#a5d6a7;background:#f1f8f1}
 pre{background:#1e1e2e;color:#cdd6f4;font-family:'SF Mono',Monaco,'Inconsolata',monospace;font-size:12px;line-height:1.6;padding:20px;white-space:pre-wrap;word-break:break-word;margin:0}
 </style>
 </head>
@@ -783,17 +784,6 @@ pre{background:#1e1e2e;color:#cdd6f4;font-family:'SF Mono',Monaco,'Inconsolata',
 <p>Copiez chaque section et collez-la dans un modèle dIA.</p>
 </div>
 ` + sb.String() + `</div>
-<script>
-function copySection(id) {
-  const text = document.getElementById(id).textContent;
-  navigator.clipboard.writeText(text).then(() => {
-    const btn = document.querySelector('[onclick="copySection(\'' + id + '\')"]');
-    btn.textContent = 'Copié !';
-    btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = 'Copier'; btn.classList.remove('copied'); }, 2000);
-  });
-}
-</script>
 </body>
 </html>`
 }
