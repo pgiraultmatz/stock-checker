@@ -646,8 +646,6 @@ func fetchAllXGroups(ctx context.Context, cfg *config.Config, logger *slog.Logge
 	var result []ai.XGroupSection
 	first := true
 	for _, group := range cfg.XGroups {
-		var groupBuf strings.Builder
-		var activeAccounts []string
 		for _, account := range group.Accounts {
 			account = strings.TrimSpace(account)
 			if account == "" {
@@ -666,16 +664,9 @@ func fetchAllXGroups(ctx context.Context, cfg *config.Config, logger *slog.Logge
 			logger.Info("tweets fetched", "group", group.Name, "user", account, "total", len(tweets))
 			tweets = twitter.FilterRecent(tweets)
 			logger.Info("tweets after filter", "group", group.Name, "user", account, "recent", len(tweets))
-			if section := twitter.FormatTweets(account, tweets); section != "" {
-				if len(group.Accounts) > 1 {
-					groupBuf.WriteString(fmt.Sprintf("@%s:\n", account))
-				}
-				groupBuf.WriteString(section)
-				activeAccounts = append(activeAccounts, account)
+			if content := twitter.FormatTweets(account, tweets); content != "" {
+				result = append(result, ai.XGroupSection{Name: group.Name, Accounts: []string{account}, Content: content})
 			}
-		}
-		if groupBuf.Len() > 0 {
-			result = append(result, ai.XGroupSection{Name: group.Name, Accounts: activeAccounts, Content: groupBuf.String()})
 		}
 	}
 	return result
