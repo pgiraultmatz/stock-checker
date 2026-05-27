@@ -772,7 +772,7 @@ pre{background:#1e1e2e;color:#cdd6f4;font-family:'SF Mono',Monaco,'Inconsolata',
 <div class="wrap">
 <div class="hdr">
 <h2>Prompt pour analyse IA</h2>
-<p>Copiez chaque section et collez-la dans un modèle dIA.</p>
+<p>Copiez chaque section et collez-la dans un modèle IA.</p>
 </div>
 ` + sb.String() + `</div>
 </body>
