@@ -2,6 +2,8 @@ package alerts
 
 import (
 	"fmt"
+	"math"
+	"sort"
 	"strings"
 	"time"
 )
@@ -28,6 +30,17 @@ func groupByTicker(alerts []Alert) []grouped {
 	return result
 }
 
+func sortByAbsoluteChange(alerts []grouped) {
+	sort.SliceStable(alerts, func(i, j int) bool {
+		left := math.Abs(alerts[i].ChangePercent)
+		right := math.Abs(alerts[j].ChangePercent)
+		if left == right {
+			return alerts[i].Stock.Ticker < alerts[j].Stock.Ticker
+		}
+		return left > right
+	})
+}
+
 // GenerateReport produces a simple HTML email body for the triggered alerts.
 // Stocks that crossed multiple thresholds in the same run appear as a single row.
 func GenerateReport(alerts []Alert) string {
@@ -38,12 +51,15 @@ func GenerateReport(alerts []Alert) string {
 <head>
 <meta charset="UTF-8">
 <style>
-  body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+  body { font-family: Arial, sans-serif; max-width: 760px; margin: 0 auto; padding: 20px; background: #f5f5f5; color: #24303d; }
   h2 { color: #333; border-bottom: 2px solid #e74c3c; padding-bottom: 8px; }
   table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
   th { background: #2c3e50; color: white; padding: 10px 14px; text-align: left; font-size: 13px; }
   td { padding: 10px 14px; border-bottom: 1px solid #eee; font-size: 14px; }
   tr:last-child td { border-bottom: none; }
+  .category { color:#888; font-size:12px; }
+  .ticker { font-weight: bold; white-space: nowrap; }
+  .number { text-align: right; white-space: nowrap; }
   .up   { color: #27ae60; font-weight: bold; }
   .down { color: #e74c3c; font-weight: bold; }
   .footer { margin-top: 16px; font-size: 12px; color: #999; }
@@ -56,7 +72,10 @@ func GenerateReport(alerts []Alert) string {
 	sb.WriteString("<table>\n")
 	sb.WriteString("  <tr><th>Stock</th><th>Ticker</th><th>Category</th><th>Open</th><th>Current</th><th>Change</th></tr>\n")
 
-	for _, g := range groupByTicker(alerts) {
+	groupedAlerts := groupByTicker(alerts)
+	sortByAbsoluteChange(groupedAlerts)
+
+	for _, g := range groupedAlerts {
 		changeClass := "up"
 		changeSign := "+"
 		if g.ChangePercent < 0 {
@@ -66,11 +85,11 @@ func GenerateReport(alerts []Alert) string {
 		sb.WriteString(fmt.Sprintf(
 			`  <tr>
     <td>%s</td>
-    <td><strong>%s</strong></td>
-    <td style="color:#888;font-size:12px">%s</td>
-    <td>%.2f</td>
-    <td>%.2f</td>
-    <td class="%s">%s%.2f%%</td>
+    <td class="ticker">%s</td>
+    <td class="category">%s</td>
+    <td class="number">%.2f</td>
+    <td class="number">%.2f</td>
+    <td class="number %s">%s%.2f%%</td>
   </tr>
 `,
 			g.Stock.Name, g.Stock.Ticker,
