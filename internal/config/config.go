@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"stock-checker/internal/macro"
 	"stock-checker/internal/models"
 )
 
@@ -304,13 +305,14 @@ type StockFundamentals struct {
 
 // StockDataFile is the structure written to stock-data.json in the Gist.
 type StockDataFile struct {
-	UpdatedAt time.Time                    `json:"updated_at"`
-	Stocks    map[string]StockFundamentals `json:"stocks"`
+	UpdatedAt   time.Time                    `json:"updated_at"`
+	Stocks      map[string]StockFundamentals `json:"stocks"`
+	MacroEvents []macro.Event                `json:"macro_events,omitempty"`
 }
 
 // SaveFundamentals writes computed fundamental data to stock-data.json in the Gist.
 // It is a no-op when GIST_ID is not set.
-func SaveFundamentals(results []*models.StockResult, signals map[string][2]string) error {
+func SaveFundamentals(results []*models.StockResult, signals map[string][2]string, macroEvents []macro.Event) error {
 	gistID := os.Getenv("GIST_ID")
 	if gistID == "" {
 		return nil
@@ -319,10 +321,16 @@ func SaveFundamentals(results []*models.StockResult, signals map[string][2]strin
 	if token == "" {
 		return fmt.Errorf("GH_TOKEN is required to save fundamentals")
 	}
+	if macroEvents == nil {
+		if existing := LoadStockData(); existing != nil {
+			macroEvents = existing.MacroEvents
+		}
+	}
 
 	data := StockDataFile{
-		UpdatedAt: time.Now().UTC(),
-		Stocks:    make(map[string]StockFundamentals, len(results)),
+		UpdatedAt:   time.Now().UTC(),
+		Stocks:      make(map[string]StockFundamentals, len(results)),
+		MacroEvents: macroEvents,
 	}
 	for _, r := range results {
 		if r.Error != nil {
@@ -382,6 +390,15 @@ func SaveFundamentals(results []*models.StockResult, signals map[string][2]strin
 // LoadFundamentals reads stock-data.json from the Gist and returns the existing data.
 // Returns an empty map if GIST_ID is not set or the file is not found.
 func LoadFundamentals() map[string]StockFundamentals {
+	data := LoadStockData()
+	if data == nil {
+		return nil
+	}
+	return data.Stocks
+}
+
+// LoadStockData reads stock-data.json from the Gist.
+func LoadStockData() *StockDataFile {
 	gistID := os.Getenv("GIST_ID")
 	token := os.Getenv("GH_TOKEN")
 	if gistID == "" || token == "" {
@@ -419,7 +436,7 @@ func LoadFundamentals() map[string]StockFundamentals {
 	if err := json.Unmarshal([]byte(f.Content), &data); err != nil {
 		return nil
 	}
-	return data.Stocks
+	return &data
 }
 
 // FindConfigFile searches for a config file in common locations.

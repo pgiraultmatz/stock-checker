@@ -17,8 +17,9 @@ var (
 
 // EconomicEvent represents a macro economic event from the Yahoo Finance calendar.
 type EconomicEvent struct {
-	Name string
-	Date time.Time
+	Name   string
+	Date   time.Time
+	Source string
 }
 
 // GetEconomicEvents fetches high-importance economic events for the current week
@@ -38,7 +39,7 @@ func (c *Client) GetEconomicEvents(ctx context.Context) ([]EconomicEvent, error)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, nil
+		return nil, fmt.Errorf("yahoo economic calendar returned %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -74,8 +75,9 @@ func (c *Client) GetEconomicEvents(ctx context.Context) ([]EconomicEvent, error)
 		}
 
 		events = append(events, EconomicEvent{
-			Name: strings.TrimSuffix(strings.TrimSpace(name), " *"),
-			Date: t,
+			Name:   strings.TrimSuffix(strings.TrimSpace(name), " *"),
+			Date:   t,
+			Source: "Yahoo Finance",
 		})
 	}
 

@@ -17,6 +17,7 @@ import (
 	"stock-checker/internal/ai"
 	"stock-checker/internal/alerts"
 	"stock-checker/internal/config"
+	"stock-checker/internal/macro"
 	"stock-checker/internal/models"
 	"stock-checker/internal/report"
 	"stock-checker/internal/twitter"
@@ -56,18 +57,18 @@ func main() {
 	configPath := flag.String("config", "config.json", "Path to configuration file")
 	twitterPromptPath := flag.String("twitter-prompt", "twitter_prompt.txt", "Path to Twitter-only prompt template file")
 	outputPath := flag.String("output", "", "Path to output HTML file (defaults to stdout)")
-	promptOutput     := flag.String("prompt-output", "", "Path to write the generated prompt as plain text (optional)")
+	promptOutput := flag.String("prompt-output", "", "Path to write the generated prompt as plain text (optional)")
 	promptHTMLOutput := flag.String("prompt-html-output", "", "Path to write the generated prompt as a standalone HTML email (optional)")
 	check := flag.Bool("check", false, "Check a single stock (use -ticker to specify, random otherwise)")
 	ticker := flag.String("ticker", "", "Ticker symbol to check (implies -check)")
 	verbose := flag.Bool("verbose", false, "Enable verbose logging")
 	timeout := flag.Duration("timeout", 5*time.Minute, "Timeout for the entire operation")
-	mock       := flag.Bool("mock", false, "Use mock data instead of fetching from APIs (for testing report generation)")
-	noTwitter  := flag.Bool("no-twitter", false, "Skip Twitter fetching")
-	twitterOnly  := flag.Bool("twitter-only", false, "Fetch tweets and output a standalone analysis prompt (no Yahoo Finance)")
-	checkAlerts  := flag.Bool("check-alerts", false, "Check intraday price alerts and write report if any are triggered")
+	mock := flag.Bool("mock", false, "Use mock data instead of fetching from APIs (for testing report generation)")
+	noTwitter := flag.Bool("no-twitter", false, "Skip Twitter fetching")
+	twitterOnly := flag.Bool("twitter-only", false, "Fetch tweets and output a standalone analysis prompt (no Yahoo Finance)")
+	checkAlerts := flag.Bool("check-alerts", false, "Check intraday price alerts and write report if any are triggered")
 	alertsOutput := flag.String("alerts-output", "alerts.html", "Path to write the alerts HTML report")
-	cryptoOnly   := flag.Bool("crypto-only", false, "Restrict alert checks to crypto assets only (for off-market-hours runs)")
+	cryptoOnly := flag.Bool("crypto-only", false, "Restrict alert checks to crypto assets only (for off-market-hours runs)")
 	flag.Parse()
 
 	// Setup logging
@@ -429,20 +430,48 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath, promptOu
 		}
 	}
 
-	// Fetch economic events for the current week
-	var economicEvents []report.EconomicEventData
-	if events, err := yahooClient.GetEconomicEvents(ctx); err != nil {
-		logger.Warn("failed to fetch economic events, continuing without them", "error", err)
+	// Fetch and persist macro events. Official sources cover critical dates like FOMC;
+	// Yahoo remains a best-effort supplement.
+	var officialEvents []macro.Event
+	if events, err := macro.UpcomingOfficialEvents(ctx, nil, time.Now(), 21); err != nil {
+		logger.Warn("failed to fetch official macro events, continuing with supplements", "error", err)
 	} else {
-		for _, e := range events {
-			economicEvents = append(economicEvents, report.EconomicEventData{
-				Name: e.Name,
-				Date: e.Date.Format("Mon 02 Jan, 15:04"),
-			})
-		}
-		logger.Info("economic events fetched", "count", len(economicEvents))
+		officialEvents = events
+		logger.Info("official macro events fetched", "count", len(officialEvents))
 	}
 
+	var yahooEvents []macro.Event
+	if events, err := yahooClient.GetEconomicEvents(ctx); err != nil {
+		logger.Warn("failed to fetch yahoo economic events, continuing without yahoo supplement", "error", err)
+	} else {
+		for _, e := range events {
+			yahooEvents = append(yahooEvents, macro.Event{
+				Name:       e.Name,
+				Date:       e.Date,
+				Category:   "Economic",
+				Source:     e.Source,
+				Importance: "unknown",
+			})
+		}
+		logger.Info("yahoo economic events fetched", "count", len(yahooEvents))
+	}
+
+	macroEvents := macro.Merge(officialEvents, yahooEvents)
+	if len(macroEvents) == 0 {
+		if existing := config.LoadStockData(); existing != nil {
+			macroEvents = macro.Upcoming(existing.MacroEvents, time.Now(), 21)
+			if len(macroEvents) > 0 {
+				logger.Warn("using cached macro events because fresh fetch returned none", "count", len(macroEvents))
+			}
+		}
+	}
+	var economicEvents []report.EconomicEventData
+	for _, e := range macroEvents {
+		economicEvents = append(economicEvents, report.EconomicEventData{
+			Name: e.Name,
+			Date: e.Date.Format("Mon 02 Jan, 15:04"),
+		})
+	}
 	// Generate HTML report
 	generator, err := report.NewGenerator(cfg.GetCategoryEmoji(), cfg.GetCategoryOrder(), cfg.GetCategoryNarrative(), cfg.GetCategoryNarrativeScore())
 	if err != nil {
@@ -456,10 +485,10 @@ func runFullReport(ctx context.Context, cfg *config.Config, outputPath, promptOu
 
 	// Save fundamentals to Gist so stock-portfolio can read them without re-fetching
 	signals := generator.ExtractSignals(results)
-	if err := config.SaveFundamentals(results, signals); err != nil {
-		logger.Warn("failed to save fundamentals to gist, continuing", "error", err)
+	if err := config.SaveFundamentals(results, signals, macroEvents); err != nil {
+		logger.Warn("failed to save stock data to gist, continuing", "error", err)
 	} else {
-		logger.Info("fundamentals saved to gist")
+		logger.Info("stock data saved to gist", "macro_events", len(macroEvents))
 	}
 
 	// Output report
